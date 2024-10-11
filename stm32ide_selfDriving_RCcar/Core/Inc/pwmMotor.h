@@ -31,4 +31,9 @@ void RCcar_go_backward(uint8_t speed_percent);
 void RCcar_stop();
 void RCcar_analogStick(uint8_t x, uint8_t y);
 
+void autoCar_go_go_forward();
+void autoCar_go_soft_right();
+void autoCar_go_soft_left();
+void autoCar_go_go_backward();
+
 #endif /* PWMMOTOR_H_ */

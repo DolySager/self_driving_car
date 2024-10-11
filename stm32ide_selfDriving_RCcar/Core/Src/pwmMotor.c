@@ -151,3 +151,36 @@ void RCcar_analogStick(uint8_t x, uint8_t y)
 	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, motor_A_duty);
 	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, motor_B_duty);
 }
+
+void autoCar_go_forward()
+{
+	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
+	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>1);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>1);
+
+}
+
+void autoCar_go_soft_left()
+{
+	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
+	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>3);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>2);
+}
+
+void autoCar_go_soft_right()
+{
+	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
+	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>2);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>3);
+}
+
+void autoCar_go_backward()
+{
+	pwmMotor_directionShift (CHANNEL_MOTOR_A, BACKWARD);
+	pwmMotor_directionShift (CHANNEL_MOTOR_B, BACKWARD);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>2);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>2);
+}

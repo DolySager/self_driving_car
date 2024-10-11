@@ -43,7 +43,10 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
+extern uint8_t rxChar;
+extern uint32_t echo_time_us[3];
+extern uint8_t mode_auto_manu;
+extern uint16_t echo_time_queue[3][10];
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -61,16 +64,11 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define htim_pwmMotor htim3
 #define huart_bluetooth huart1
+#define htim_echoMeasure htim4
 #define TRIG_LEFT_Pin GPIO_PIN_0
 #define TRIG_LEFT_GPIO_Port GPIOC
 #define TRIG_CENTER_Pin GPIO_PIN_1
 #define TRIG_CENTER_GPIO_Port GPIOC
-#define ECHO_RIGHT_Pin GPIO_PIN_0
-#define ECHO_RIGHT_GPIO_Port GPIOA
-#define ECHO_CENTER_Pin GPIO_PIN_1
-#define ECHO_CENTER_GPIO_Port GPIOA
-#define ECHO_LEFT_Pin GPIO_PIN_4
-#define ECHO_LEFT_GPIO_Port GPIOA
 #define out_pwmMotor_A_Pin GPIO_PIN_6
 #define out_pwmMotor_A_GPIO_Port GPIOA
 #define out_pwmMotor_B_Pin GPIO_PIN_7
@@ -85,10 +83,22 @@ void Error_Handler(void);
 #define GPIO_motorDriver_IN3_GPIO_Port GPIOB
 #define GPIO_motorDriver_IN4_Pin GPIO_PIN_5
 #define GPIO_motorDriver_IN4_GPIO_Port GPIOB
+#define ECHO_LEFT_Pin GPIO_PIN_6
+#define ECHO_LEFT_GPIO_Port GPIOB
+#define ECHO_CENTER_Pin GPIO_PIN_7
+#define ECHO_CENTER_GPIO_Port GPIOB
+#define ECHO_RIGHT_Pin GPIO_PIN_8
+#define ECHO_RIGHT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 #define CHANNEL_MOTOR_A TIM_CHANNEL_1
 #define CHANNEL_MOTOR_B TIM_CHANNEL_2
+#define CHANNEL_ECHO_LEFT TIM_CHANNEL_1
+#define CHANNEL_ECHO_CENTER TIM_CHANNEL_2
+#define CHANNEL_ECHO_RIGHT TIM_CHANNEL_3
+#define ACTIVE_CHANNEL_ECHO_LEFT HAL_TIM_ACTIVE_CHANNEL_1
+#define ACTIVE_CHANNEL_ECHO_CENTER HAL_TIM_ACTIVE_CHANNEL_2
+#define ACTIVE_CHANNEL_ECHO_RIGHT HAL_TIM_ACTIVE_CHANNEL_3
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

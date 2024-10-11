@@ -21,7 +21,37 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+extern void RCcar_analogStick(uint8_t x, uint8_t y);
 
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	// Android arduino bluetooth controller app
+	if (huart == &huart_bluetooth)
+	{
+		switch (rxChar)
+		{
+		case 'F':
+			if (!mode_auto_manu) RCcar_go_forward(100);
+			break;
+		case 'B':
+			if (!mode_auto_manu) RCcar_go_backward(100);
+			break;
+		case 'L':
+			if (!mode_auto_manu) RCcar_go_soft_left(100);
+			break;
+		case 'R':
+			if (!mode_auto_manu) RCcar_go_soft_right(100);
+			break;
+		case 'A':
+			mode_auto_manu = !mode_auto_manu;
+			break;
+		case '0':
+			if (!mode_auto_manu) RCcar_stop();
+			break;
+		}
+	}
+
+}
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;

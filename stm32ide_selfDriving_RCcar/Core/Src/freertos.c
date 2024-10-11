@@ -68,6 +68,13 @@ const osThreadAttr_t ultsnc_right_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for auto_drive */
+osThreadId_t auto_driveHandle;
+const osThreadAttr_t auto_drive_attributes = {
+  .name = "auto_drive",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -77,6 +84,7 @@ const osThreadAttr_t ultsnc_right_attributes = {
 void StartTask_ultsnc_left(void *argument);
 void StartTask_ultsnc_center(void *argument);
 void StartTask_ultsnc_right(void *argument);
+void StartTask_auto_drive(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -116,6 +124,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of ultsnc_right */
   ultsnc_rightHandle = osThreadNew(StartTask_ultsnc_right, NULL, &ultsnc_right_attributes);
 
+  /* creation of auto_drive */
+  auto_driveHandle = osThreadNew(StartTask_auto_drive, NULL, &auto_drive_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -139,17 +150,14 @@ void StartTask_ultsnc_left(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  uint32_t echo_pulse_width_us = 0;
-	  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_SET);
-	  delay_us(10);
-	  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_RESET);
-	  while (HAL_GPIO_ReadPin(ECHO_LEFT_GPIO_Port, ECHO_LEFT_Pin) == GPIO_PIN_RESET);
-	  while (HAL_GPIO_ReadPin(ECHO_LEFT_GPIO_Port, ECHO_LEFT_Pin) == GPIO_PIN_SET)
+	  if (mode_auto_manu)
 	  {
-		  ++echo_pulse_width_us;
-		  delay_us(1);
+		  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_SET);
+		  delay_us(10);
+		  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_RESET);
+		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC1);
+		  osDelay(100);
 	  }
-	  printf("LEFT Pulse width: %d us\n", echo_pulse_width_us);
   }
   /* USER CODE END StartTask_ultsnc_left */
 }
@@ -167,8 +175,14 @@ void StartTask_ultsnc_center(void *argument)
   /* Infinite loop */
   for(;;)
   {
-
-    osDelay(1);
+	  if (mode_auto_manu)
+	  {
+		  HAL_GPIO_WritePin(TRIG_CENTER_GPIO_Port, TRIG_CENTER_Pin, GPIO_PIN_SET);
+		  delay_us(10);
+		  HAL_GPIO_WritePin(TRIG_CENTER_GPIO_Port, TRIG_CENTER_Pin, GPIO_PIN_RESET);
+		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC2);
+		  osDelay(100);
+	  }
   }
   /* USER CODE END StartTask_ultsnc_center */
 }
@@ -186,9 +200,51 @@ void StartTask_ultsnc_right(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  if (mode_auto_manu)
+	  {
+		  HAL_GPIO_WritePin(TRIG_RIGHT_GPIO_Port, TRIG_RIGHT_Pin, GPIO_PIN_SET);
+		  delay_us(10);
+		  HAL_GPIO_WritePin(TRIG_RIGHT_GPIO_Port, TRIG_RIGHT_Pin, GPIO_PIN_RESET);
+		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC3);
+		  osDelay(100);
+	  }
   }
   /* USER CODE END StartTask_ultsnc_right */
+}
+
+/* USER CODE BEGIN Header_StartTask_auto_drive */
+/**
+* @brief Function implementing the auto_drive thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask_auto_drive */
+void StartTask_auto_drive(void *argument)
+{
+  /* USER CODE BEGIN StartTask_auto_drive */
+  /* Infinite loop */
+  for(;;)
+  {
+	if (mode_auto_manu)
+	{
+		for (uint8_t j=0; j<3; ++j)
+		{
+			uint32_t sum_tmp = 0;
+			for (uint8_t i=0; i<10; ++i)
+			{
+				sum_tmp +=echo_time_queue[j][i];
+			}
+			echo_time_us[j] = sum_tmp / 10;
+		}
+		printf("%u\t%u\t%u\n",echo_time_us[0], echo_time_us[1], echo_time_us[2]);
+		if (echo_time_us[1] > 1500) RCcar_go_forward(40);
+		else if (echo_time_us[1] < 1000) RCcar_go_backward(40);
+		else if (echo_time_us[2] < echo_time_us[0]) RCcar_go_soft_left(40);
+		else RCcar_go_soft_right(40);
+	    osDelay(100);
+	}
+  }
+  /* USER CODE END StartTask_auto_drive */
 }
 
 /* Private application code --------------------------------------------------*/

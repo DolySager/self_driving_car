@@ -16,25 +16,25 @@
   ******************************************************************************
   * Pinout
   *
-  *	C10		C11									C9		C8
-  *	C12		D2									B8		C6
-  *	VDD		E5V									B9		C5
-  *	BOOT0	GND									AVDD	U5V
-  *	NC		NC									GND		NC
-  *	NC		IOREF								A5		A12
-  *	A13		RESET					MOTOR_A_PWM	A6		A11
-  *	A14		3V3						MOTOR_B_PWM	A7		B12
-  *	A15		3V									B6		NC
-  *	GND		GND									C7		GND
-  *	B7		GND						UART1_TX	A9		B2
-  *	C13		VIN						IN1			A8		B1
-  *	C14		NC						IN2			B10		B15
-  *	C15		A0	ECHO_3	(Right)		IN3			B4		B14
-  *	H0		A1	ECHO_2	(Center)	IN4			B5		B13
-  *	H1		A4	ECHO_1	(Left)					B3		AGND
-  *	VBAT	B0	TRIG_3	(Right)		UART1_RX	A10		C4
-  *	C2		C1	TRIG_2	(Center)				A2		NC
-  *	C3		C0	TRIG_1	(Left)					A3		NC
+  *				C10		C11										C9		C8
+  *				C12		D2							ECHO_RIGHT	B8		C6
+  *				VDD		E5V										B9		C5
+  *				BOOT0	GND										AVDD	U5V
+  *				NC		NC										GND		NC
+  *				NC		IOREF									A5		A12
+  *				A13		RESET					MOTOR_LEFT_PWM	A6		A11
+  *				A14		3V3						MOTOR_RIGHT_PWM	A7		B12
+  *				A15		3V							ECHO_LEFT	B6		NC
+  *				GND		GND										C7		GND
+  *	ECHO_CENTER	B7		GND							UART1_TX	A9		B2
+  *				C13		VIN							IN1			A8		B1
+  *				C14		NC							IN2			B10		B15
+  *				C15		A0							IN3			B4		B14
+  *				H0		A1							IN4			B5		B13
+  *				H1		A4										B3		AGND
+  *				VBAT	B0	TRIG_RIGHT				UART1_RX	A10		C4
+  *				C2		C1	TRIG_CENTER							A2		NC
+  *				C3		C0	TRIG_LEFT							A3		NC
   ******************************************************************************
   *
   */
@@ -70,8 +70,10 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern uint8_t rxChar;
-extern uint8_t rxString[2];
+uint8_t rxChar;
+uint32_t echo_time_us[3];	// 0: left, 1: center, 2: right
+uint8_t mode_auto_manu = 0;
+uint16_t echo_time_queue[3][10];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -133,12 +135,16 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_TIM10_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   pwmMotor_init(&htim_pwmMotor, CHANNEL_MOTOR_A);
   pwmMotor_init(&htim_pwmMotor, CHANNEL_MOTOR_B);
-  //HAL_UART_Receive_IT(&huart_bluetooth, &rxChar, 1);
-  HAL_UART_Receive_DMA(&huart_bluetooth, rxString, 2);
+  HAL_UART_Receive_DMA(&huart_bluetooth, &rxChar, 1);
   HAL_TIM_Base_Start(&htim10);
+
+  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_LEFT);
+  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_CENTER);
+  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_RIGHT);
   /* USER CODE END 2 */
 
   /* Init scheduler */
