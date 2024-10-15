@@ -61,6 +61,47 @@ void pwmMotor_directionShift (uint32_t motor_channel, pwmMotor_direction dir)
 	}
 }
 
+void RCcar_set_motor_speed (int8_t left_speed_percent, int8_t right_speed_percent)
+{
+	uint16_t left_motor_duty, right_motor_duty;
+
+	if (left_speed_percent > 0)
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
+		left_motor_duty = left_speed_percent * max_duty / 100;
+	}
+	else if (left_speed_percent < 0)
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_A, BACKWARD);
+		left_motor_duty = -1.0 * left_speed_percent * max_duty / 100;
+	}
+	else /* (left_speed_percent == 0) */
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_A, BREAK);
+		left_motor_duty = 0;
+	}
+
+
+	if (right_speed_percent > 0)
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
+		right_motor_duty = right_speed_percent * max_duty / 100;
+	}
+	else if (right_speed_percent < 0)
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_B, BACKWARD);
+		right_motor_duty = -1.0 * right_speed_percent * max_duty / 100;
+	}
+	else /* (right_speed_percent == 0) */
+	{
+		pwmMotor_directionShift (CHANNEL_MOTOR_B, BREAK);
+		right_motor_duty = 0;
+	}
+
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, left_motor_duty);
+	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, right_motor_duty);
+}
+
 void RCcar_go_forward(uint8_t speed_percent)
 {
 	uint16_t duty = speed_percent * max_duty / 100;
@@ -150,37 +191,4 @@ void RCcar_analogStick(uint8_t x, uint8_t y)
 
 	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, motor_A_duty);
 	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, motor_B_duty);
-}
-
-void autoCar_go_forward()
-{
-	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
-	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>1);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>1);
-
-}
-
-void autoCar_go_soft_left()
-{
-	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
-	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>3);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>2);
-}
-
-void autoCar_go_soft_right()
-{
-	pwmMotor_directionShift (CHANNEL_MOTOR_A, FORWARD);
-	pwmMotor_directionShift (CHANNEL_MOTOR_B, FORWARD);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>2);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>3);
-}
-
-void autoCar_go_backward()
-{
-	pwmMotor_directionShift (CHANNEL_MOTOR_A, BACKWARD);
-	pwmMotor_directionShift (CHANNEL_MOTOR_B, BACKWARD);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_A, max_duty>>2);
-	pwmMotor_setDuty(&htim_pwmMotor, CHANNEL_MOTOR_B, max_duty>>2);
 }

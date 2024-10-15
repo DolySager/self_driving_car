@@ -17,24 +17,24 @@
   * Pinout
   *
   *				C10		C11										C9		C8
-  *				C12		D2							ECHO_RIGHT	B8		C6
-  *				VDD		E5V										B9		C5
-  *				BOOT0	GND										AVDD	U5V
+  *				C12		D2										B8		C6
+  *				VDD		E5V		BAT_POWER						B9		C5
+  *				BOOT0	GND		BAT_GND							AVDD	U5V
   *				NC		NC										GND		NC
   *				NC		IOREF									A5		A12
-  *				A13		RESET					MOTOR_LEFT_PWM	A6		A11
-  *				A14		3V3						MOTOR_RIGHT_PWM	A7		B12
-  *				A15		3V							ECHO_LEFT	B6		NC
-  *				GND		GND										C7		GND
-  *	ECHO_CENTER	B7		GND							UART1_TX	A9		B2
-  *				C13		VIN							IN1			A8		B1
-  *				C14		NC							IN2			B10		B15
-  *				C15		A0							IN3			B4		B14
-  *				H0		A1							IN4			B5		B13
-  *				H1		A4										B3		AGND
-  *				VBAT	B0	TRIG_RIGHT				UART1_RX	A10		C4
-  *				C2		C1	TRIG_CENTER							A2		NC
-  *				C3		C0	TRIG_LEFT							A3		NC
+  *				A13		RESET					ECHO_LEFT		A6		A11
+  *				A14		3V3										A7		B12
+  *	USART1 TX	A15		5V		BT_POWER		ECHO_RIGHT		B6		NC
+  *				GND		GND		BT_GND							C7		GND
+  *				B7		GND						TRIG_CENTER		A9		B2
+  *				C13		VIN						TRIG_LEFT		A8		B1		IN1
+  *				C14		NC										B10		B15		IN2
+  *				C15		A0		MOTOR_A							B4		B14		IN3
+  *				H0		A1		MOTOR_B							B5		B13		IN4
+  *				H1		A4						USART1 RX		B3		AGND
+  *				VBAT	B0		ECHO_CENTER		TRIG_RIGHT		A10		C4
+  *				C2		C1										A2		NC
+  *				C3		C0										A3		NC
   ******************************************************************************
   *
   */
@@ -71,9 +71,16 @@
 
 /* USER CODE BEGIN PV */
 uint8_t rxChar;
-uint32_t echo_time_us[3];	// 0: left, 1: center, 2: right
+int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
 uint8_t mode_auto_manu = 0;
 uint16_t echo_time_queue[3][10];
+uint32_t echo_left_rise_time, echo_left_fall_time;
+uint32_t echo_center_rise_time, echo_center_fall_time;
+uint32_t echo_right_rise_time, echo_right_fall_time;
+float left_motor_duty_float, right_motor_duty_float;
+int left_motor_duty_int, right_motor_duty_int;
+int left_motor_duty_int_raw, right_motor_duty_int_raw;
+uint8_t arbitrary_turn_right_left = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,7 +102,7 @@ PUTCHAR_PROTOTYPE
 {
   /* Place your implementation of fputc here */
   /* e.g. write a character to the USART3 and Loop until the end of transmission */
-  HAL_UART_Transmit(&huart2, (uint8_t *) &ch, 1, 0xFFFF);
+  HAL_UART_Transmit(&huart_bluetooth, (uint8_t *) &ch, 1, 0xFFFF);
 
   return ch;
 }
@@ -134,17 +141,25 @@ int main(void)
   MX_TIM3_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  MX_TIM10_Init();
   MX_TIM4_Init();
+  MX_TIM1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   pwmMotor_init(&htim_pwmMotor, CHANNEL_MOTOR_A);
   pwmMotor_init(&htim_pwmMotor, CHANNEL_MOTOR_B);
-  HAL_UART_Receive_DMA(&huart_bluetooth, &rxChar, 1);
-  HAL_TIM_Base_Start(&htim10);
 
-  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_LEFT);
-  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_CENTER);
-  HAL_TIM_IC_Start_IT(&htim_echoMeasure, CHANNEL_ECHO_RIGHT);
+  HAL_TIM_PWM_Start(&htim_triggerPulse, CHANNEL_TRIG_LEFT);
+  HAL_TIM_PWM_Start(&htim_triggerPulse, CHANNEL_TRIG_CENTER);
+  HAL_TIM_PWM_Start(&htim_triggerPulse, CHANNEL_TRIG_RIGHT);
+
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_1, CHANNEL_ECHO_LEFT_RISING, &echo_left_rise_time, 1);
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_1, CHANNEL_ECHO_LEFT_FALLING, &echo_left_fall_time, 1);
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_1, CHANNEL_ECHO_CENTER_RISING, &echo_center_rise_time, 1);
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_1, CHANNEL_ECHO_CENTER_FALLING, &echo_center_fall_time, 1);
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_2, CHANNEL_ECHO_RIGHT_RISING, &echo_right_rise_time, 1);
+  HAL_TIM_IC_Start_DMA(&htim_echoMeasure_2, CHANNEL_ECHO_RIGHT_FALLING, &echo_right_fall_time, 1);
+
+  HAL_UART_Receive_DMA(&huart_bluetooth, &rxChar, 1);
   /* USER CODE END 2 */
 
   /* Init scheduler */

@@ -1,4 +1,3 @@
-"./Core/Src/delay.o"
 "./Core/Src/dma.o"
 "./Core/Src/freertos.o"
 "./Core/Src/gpio.o"

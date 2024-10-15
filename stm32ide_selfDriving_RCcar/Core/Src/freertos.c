@@ -47,31 +47,24 @@
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* Definitions for ultsnc_left */
-osThreadId_t ultsnc_leftHandle;
-const osThreadAttr_t ultsnc_left_attributes = {
-  .name = "ultsnc_left",
+/* Definitions for auto_drive_task */
+osThreadId_t auto_drive_taskHandle;
+const osThreadAttr_t auto_drive_task_attributes = {
+  .name = "auto_drive_task",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for ultsnc_center */
-osThreadId_t ultsnc_centerHandle;
-const osThreadAttr_t ultsnc_center_attributes = {
-  .name = "ultsnc_center",
+/* Definitions for get_echo_time */
+osThreadId_t get_echo_timeHandle;
+const osThreadAttr_t get_echo_time_attributes = {
+  .name = "get_echo_time",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for ultsnc_right */
-osThreadId_t ultsnc_rightHandle;
-const osThreadAttr_t ultsnc_right_attributes = {
-  .name = "ultsnc_right",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
-/* Definitions for auto_drive */
-osThreadId_t auto_driveHandle;
-const osThreadAttr_t auto_drive_attributes = {
-  .name = "auto_drive",
+/* Definitions for print_sensor_va */
+osThreadId_t print_sensor_vaHandle;
+const osThreadAttr_t print_sensor_va_attributes = {
+  .name = "print_sensor_va",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
@@ -81,10 +74,9 @@ const osThreadAttr_t auto_drive_attributes = {
 
 /* USER CODE END FunctionPrototypes */
 
-void StartTask_ultsnc_left(void *argument);
-void StartTask_ultsnc_center(void *argument);
-void StartTask_ultsnc_right(void *argument);
 void StartTask_auto_drive(void *argument);
+void StartTask_get_echo_time(void *argument);
+void StartTask_print_sensor_value(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -115,17 +107,14 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of ultsnc_left */
-  ultsnc_leftHandle = osThreadNew(StartTask_ultsnc_left, NULL, &ultsnc_left_attributes);
+  /* creation of auto_drive_task */
+  auto_drive_taskHandle = osThreadNew(StartTask_auto_drive, NULL, &auto_drive_task_attributes);
 
-  /* creation of ultsnc_center */
-  ultsnc_centerHandle = osThreadNew(StartTask_ultsnc_center, NULL, &ultsnc_center_attributes);
+  /* creation of get_echo_time */
+  get_echo_timeHandle = osThreadNew(StartTask_get_echo_time, NULL, &get_echo_time_attributes);
 
-  /* creation of ultsnc_right */
-  ultsnc_rightHandle = osThreadNew(StartTask_ultsnc_right, NULL, &ultsnc_right_attributes);
-
-  /* creation of auto_drive */
-  auto_driveHandle = osThreadNew(StartTask_auto_drive, NULL, &auto_drive_attributes);
+  /* creation of print_sensor_va */
+  print_sensor_vaHandle = osThreadNew(StartTask_print_sensor_value, NULL, &print_sensor_va_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -135,81 +124,6 @@ void MX_FREERTOS_Init(void) {
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
-}
-
-/* USER CODE BEGIN Header_StartTask_ultsnc_left */
-/**
-  * @brief  Function implementing the ultsnc_left thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartTask_ultsnc_left */
-void StartTask_ultsnc_left(void *argument)
-{
-  /* USER CODE BEGIN StartTask_ultsnc_left */
-  /* Infinite loop */
-  for(;;)
-  {
-	  if (mode_auto_manu)
-	  {
-		  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_SET);
-		  delay_us(10);
-		  HAL_GPIO_WritePin(TRIG_LEFT_GPIO_Port, TRIG_LEFT_Pin, GPIO_PIN_RESET);
-		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC1);
-		  osDelay(100);
-	  }
-  }
-  /* USER CODE END StartTask_ultsnc_left */
-}
-
-/* USER CODE BEGIN Header_StartTask_ultsnc_center */
-/**
-* @brief Function implementing the ultsnc_center thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTask_ultsnc_center */
-void StartTask_ultsnc_center(void *argument)
-{
-  /* USER CODE BEGIN StartTask_ultsnc_center */
-  /* Infinite loop */
-  for(;;)
-  {
-	  if (mode_auto_manu)
-	  {
-		  HAL_GPIO_WritePin(TRIG_CENTER_GPIO_Port, TRIG_CENTER_Pin, GPIO_PIN_SET);
-		  delay_us(10);
-		  HAL_GPIO_WritePin(TRIG_CENTER_GPIO_Port, TRIG_CENTER_Pin, GPIO_PIN_RESET);
-		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC2);
-		  osDelay(100);
-	  }
-  }
-  /* USER CODE END StartTask_ultsnc_center */
-}
-
-/* USER CODE BEGIN Header_StartTask_ultsnc_right */
-/**
-* @brief Function implementing the ultsnc_right thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTask_ultsnc_right */
-void StartTask_ultsnc_right(void *argument)
-{
-  /* USER CODE BEGIN StartTask_ultsnc_right */
-  /* Infinite loop */
-  for(;;)
-  {
-	  if (mode_auto_manu)
-	  {
-		  HAL_GPIO_WritePin(TRIG_RIGHT_GPIO_Port, TRIG_RIGHT_Pin, GPIO_PIN_SET);
-		  delay_us(10);
-		  HAL_GPIO_WritePin(TRIG_RIGHT_GPIO_Port, TRIG_RIGHT_Pin, GPIO_PIN_RESET);
-		  __HAL_TIM_ENABLE_IT(&htim_echoMeasure, TIM_IT_CC3);
-		  osDelay(100);
-	  }
-  }
-  /* USER CODE END StartTask_ultsnc_right */
 }
 
 /* USER CODE BEGIN Header_StartTask_auto_drive */
@@ -225,26 +139,95 @@ void StartTask_auto_drive(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	if (mode_auto_manu)
+
+	float k_straight = (echo_center_time_us - DIRECTION_THRESHOLD) * STRAIGHT_SENSITIVITY;
+	if (k_straight > 100.0) k_straight = 100.0;
+
+	float k_curve = (echo_left_time_us - echo_right_time_us) * TURN_SENSITIVITY;
+	if (k_curve > 100.0) k_curve = 100.0;
+	else if (k_curve < -100.0) k_curve = -100.0;
+
+	float k_curve_factor;
+	if (k_curve >= 0) k_curve_factor = k_curve;
+	else k_curve_factor = -1 * k_curve;
+
+	left_motor_duty_float = k_straight + ((100.0 - k_curve_factor) / 100.0 * k_curve);
+	right_motor_duty_float = k_straight - ((100.0 - k_curve_factor) / 100.0 * k_curve);
+
+	left_motor_duty_int_raw = (int) left_motor_duty_float;
+	right_motor_duty_int_raw = (int) right_motor_duty_float;
+
+	// left motor correction
+	if (left_motor_duty_float > 100) left_motor_duty_int = 100;
+	else if (left_motor_duty_float < -100) left_motor_duty_int = -100;
+	else if (left_motor_duty_float < 40 && left_motor_duty_float >= 0) left_motor_duty_int = 40;
+	else if (left_motor_duty_float > -40 && left_motor_duty_float < 0) left_motor_duty_int = -40;
+	else left_motor_duty_int = (int) left_motor_duty_float;
+
+	// right motor correction
+	if (right_motor_duty_float > 100) right_motor_duty_int = 100;
+	else if (right_motor_duty_float < -100) right_motor_duty_int = -100;
+	else if (right_motor_duty_float < 40 && right_motor_duty_float >= 0) right_motor_duty_int = 40;
+	else if (right_motor_duty_float > -40 && right_motor_duty_float < 0) right_motor_duty_int = -40;
+	else right_motor_duty_int = (int) right_motor_duty_float;
+
+	// arbitrary turn when too close to wall
+	if ((left_motor_duty_int - right_motor_duty_int) < 25 && (left_motor_duty_int - right_motor_duty_int) > -25)
 	{
-		for (uint8_t j=0; j<3; ++j)
-		{
-			uint32_t sum_tmp = 0;
-			for (uint8_t i=0; i<10; ++i)
-			{
-				sum_tmp +=echo_time_queue[j][i];
-			}
-			echo_time_us[j] = sum_tmp / 10;
-		}
-		printf("%u\t%u\t%u\n",echo_time_us[0], echo_time_us[1], echo_time_us[2]);
-		if (echo_time_us[1] > 1500) RCcar_go_forward(40);
-		else if (echo_time_us[1] < 1000) RCcar_go_backward(40);
-		else if (echo_time_us[2] < echo_time_us[0]) RCcar_go_soft_left(40);
-		else RCcar_go_soft_right(40);
-	    osDelay(100);
+		if (arbitrary_turn_right_left) right_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
+		else left_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
 	}
+
+	if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
+
+	osDelay(10);
   }
   /* USER CODE END StartTask_auto_drive */
+}
+
+/* USER CODE BEGIN Header_StartTask_get_echo_time */
+/**
+* @brief Function implementing the get_echo_time thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask_get_echo_time */
+void StartTask_get_echo_time(void *argument)
+{
+  /* USER CODE BEGIN StartTask_get_echo_time */
+  /* Infinite loop */
+  for(;;)
+  {
+	if (echo_left_fall_time > echo_left_rise_time) echo_left_time_us = echo_left_fall_time - echo_left_rise_time;
+	if (echo_center_fall_time > echo_center_rise_time) echo_center_time_us = echo_center_fall_time - echo_center_rise_time;
+	if (echo_right_fall_time > echo_right_rise_time) echo_right_time_us = echo_right_fall_time - echo_right_rise_time;
+
+    osDelay(10);
+  }
+  /* USER CODE END StartTask_get_echo_time */
+}
+
+/* USER CODE BEGIN Header_StartTask_print_sensor_value */
+/**
+* @brief Function implementing the print_sensor_va thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask_print_sensor_value */
+void StartTask_print_sensor_value(void *argument)
+{
+  /* USER CODE BEGIN StartTask_print_sensor_value */
+  /* Infinite loop */
+  for(;;)
+  {
+	printf("%5lu %5lu %5lu  ", echo_left_time_us, echo_center_time_us, echo_right_time_us);
+	printf("L: %+5d R:%+5d\n", left_motor_duty_int_raw, right_motor_duty_int_raw);
+
+	arbitrary_turn_right_left = !arbitrary_turn_right_left;
+
+    osDelay(1000);
+  }
+  /* USER CODE END StartTask_print_sensor_value */
 }
 
 /* Private application code --------------------------------------------------*/
