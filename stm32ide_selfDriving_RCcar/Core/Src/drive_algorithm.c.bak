@@ -1,0 +1,69 @@
+  for(;;)
+  {
+
+	float k_straight = (echo_center_time_us - DIRECTION_THRESHOLD) * STRAIGHT_SENSITIVITY;
+	if (k_straight > 100.0) k_straight = 100.0;
+
+	float k_curve = (echo_left_time_us - echo_right_time_us) * TURN_SENSITIVITY;
+	if (k_curve > 100.0) k_curve = 100.0;
+	else if (k_curve < -100.0) k_curve = -100.0;
+
+	float k_curve_factor;
+	if (k_curve >= 0) k_curve_factor = k_curve;
+	else k_curve_factor = -1 * k_curve;
+
+	left_motor_duty_float = k_straight - ((100.0 - k_curve_factor) / 100.0 * k_curve);
+	right_motor_duty_float = k_straight + ((100.0 - k_curve_factor) / 100.0 * k_curve);
+
+	left_motor_duty_int_raw = (int) left_motor_duty_float;
+	right_motor_duty_int_raw = (int) right_motor_duty_float;
+
+	// left motor correction
+	if (left_motor_duty_float > 100) left_motor_duty_int = 100;
+	else if (left_motor_duty_float < -100) left_motor_duty_int = -100;
+	else if (left_motor_duty_float < 40 && left_motor_duty_float >= 0) left_motor_duty_int = 40;
+	else if (left_motor_duty_float > -40 && left_motor_duty_float < 0) left_motor_duty_int = -40;
+	else left_motor_duty_int = (int) left_motor_duty_float;
+
+	// right motor correction
+	if (right_motor_duty_float > 100) right_motor_duty_int = 100;
+	else if (right_motor_duty_float < -100) right_motor_duty_int = -100;
+	else if (right_motor_duty_float < 40 && right_motor_duty_float >= 0) right_motor_duty_int = 40;
+	else if (right_motor_duty_float > -40 && right_motor_duty_float < 0) right_motor_duty_int = -40;
+	else right_motor_duty_int = (int) right_motor_duty_float;
+
+	// bigger turn when too close to wall
+	if ((left_motor_duty_int - right_motor_duty_int) < 25 && (left_motor_duty_int - right_motor_duty_int) > -25)
+	{
+		if (left_motor_duty_int < right_motor_duty_int) right_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
+		else left_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
+	}
+
+	if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
+
+	osDelay(10);
+  }
+  
+  
+  	// different sensor value equation
+  	left_motor_duty_float = ( (K_SAMESIDE * ( (float) echo_left_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE) + \
+							(K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD) / MAX_STRAIGHT_SENSOR_VALUE) + \
+							(K_OPPSIDE * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE ) )  \
+							 / 3 * 100;
+
+	right_motor_duty_float = ( (K_SAMESIDE * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE)+ \
+							(K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD) / MAX_STRAIGHT_SENSOR_VALUE)+ \
+							(K_OPPSIDE * ( (float) echo_left_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE )) \
+							 / 3 * 100;
+							 
+							 
+	// same max sensor value equation
+	left_motor_duty_float = ( 	K_SAMESIDE * ( (float) echo_left_time_us - DIRECTION_THRESHOLD)  + \
+								K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD)  + \
+								K_OPPSIDE * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) )  \
+							/ MAX_CURVE_SENSOR_VALUE / 3 * 100;
+
+	right_motor_duty_float = ( 	K_SAMESIDE * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) + \
+								K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD) + \
+								K_OPPSIDE * ( (float) echo_left_time_us - DIRECTION_THRESHOLD) ) \
+							/ MAX_CURVE_SENSOR_VALUE / 3 * 100;

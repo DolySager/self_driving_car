@@ -136,49 +136,80 @@ void MX_FREERTOS_Init(void) {
 void StartTask_auto_drive(void *argument)
 {
   /* USER CODE BEGIN StartTask_auto_drive */
+  osDelay(100);
   /* Infinite loop */
   for(;;)
   {
+	// apply motor values one step later
+	if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
 
-	float k_straight = (echo_center_time_us - DIRECTION_THRESHOLD) * STRAIGHT_SENSITIVITY;
-	if (k_straight > 100.0) k_straight = 100.0;
+	float distance_sensitivity = CONSTANT_CALIBRATION_MAX - (echo_left_time_us + echo_center_time_us + echo_right_time_us) / 3.0 / 2000.0;
+	if (distance_sensitivity > CONSTANT_CALIBRATION_MAX) distance_sensitivity = CONSTANT_CALIBRATION_MAX;
+	else if (distance_sensitivity < CONSTANT_CALIBRATION_MIN) distance_sensitivity = CONSTANT_CALIBRATION_MIN;
 
-	float k_curve = (echo_left_time_us - echo_right_time_us) * TURN_SENSITIVITY;
-	if (k_curve > 100.0) k_curve = 100.0;
-	else if (k_curve < -100.0) k_curve = -100.0;
+	float curve_sensitivity = CONSTANT_CALIBRATION_MIN + (echo_left_time_us - echo_right_time_us) / 2000.0;
+	if (curve_sensitivity < 0) curve_sensitivity *= -1;
+	if (curve_sensitivity > CONSTANT_CALIBRATION_MAX) curve_sensitivity = CONSTANT_CALIBRATION_MAX;
+	else if (curve_sensitivity < CONSTANT_CALIBRATION_MIN) curve_sensitivity = CONSTANT_CALIBRATION_MIN;
 
-	float k_curve_factor;
-	if (k_curve >= 0) k_curve_factor = k_curve;
-	else k_curve_factor = -1 * k_curve;
+	// and then calculate motor power for next step
+	left_motor_duty_float = (   ( (K_SAMESIDE * distance_sensitivity * curve_sensitivity) * ( (float) echo_left_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE) + \
+								(K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD) / MAX_STRAIGHT_SENSOR_VALUE) + \
+								( (K_OPPSIDE * distance_sensitivity * curve_sensitivity) * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE ) )  \
+								 / 3 * 100;
 
-	left_motor_duty_float = k_straight + ((100.0 - k_curve_factor) / 100.0 * k_curve);
-	right_motor_duty_float = k_straight - ((100.0 - k_curve_factor) / 100.0 * k_curve);
+	right_motor_duty_float = (  ( (K_SAMESIDE * distance_sensitivity * curve_sensitivity) * ( (float) echo_right_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE)+ \
+								(K_CENTER * ( (float) echo_center_time_us - DIRECTION_THRESHOLD) / MAX_STRAIGHT_SENSOR_VALUE)+ \
+								( (K_OPPSIDE * distance_sensitivity * curve_sensitivity) * ( (float) echo_left_time_us - DIRECTION_THRESHOLD) / MAX_CURVE_SENSOR_VALUE )) \
+								 / 3 * 100;
 
-	left_motor_duty_int_raw = (int) left_motor_duty_float;
-	right_motor_duty_int_raw = (int) right_motor_duty_float;
-
-	// left motor correction
-	if (left_motor_duty_float > 100) left_motor_duty_int = 100;
-	else if (left_motor_duty_float < -100) left_motor_duty_int = -100;
-	else if (left_motor_duty_float < 40 && left_motor_duty_float >= 0) left_motor_duty_int = 40;
-	else if (left_motor_duty_float > -40 && left_motor_duty_float < 0) left_motor_duty_int = -40;
-	else left_motor_duty_int = (int) left_motor_duty_float;
-
-	// right motor correction
-	if (right_motor_duty_float > 100) right_motor_duty_int = 100;
-	else if (right_motor_duty_float < -100) right_motor_duty_int = -100;
-	else if (right_motor_duty_float < 40 && right_motor_duty_float >= 0) right_motor_duty_int = 40;
-	else if (right_motor_duty_float > -40 && right_motor_duty_float < 0) right_motor_duty_int = -40;
-	else right_motor_duty_int = (int) right_motor_duty_float;
-
-	// arbitrary turn when too close to wall
-	if ((left_motor_duty_int - right_motor_duty_int) < 25 && (left_motor_duty_int - right_motor_duty_int) > -25)
+	// deadlock escape
+	if (((echo_left_time_us + echo_center_time_us + echo_right_time_us) / 3.0) < deadlock_threshold)
 	{
-		if (arbitrary_turn_right_left) right_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
-		else left_motor_duty_int += ARBITRARY_TURN_POWER_COMPENSATION;
+		if (arbitrary_turn_right_left)
+		{
+			if (left_motor_duty_float > 0) left_motor_duty_float *= CONSTANT_DEADLOCK_MAX;
+			else left_motor_duty_float *= CONSTANT_DEADLOCK_MIN;
+			if (right_motor_duty_float > 0) right_motor_duty_float *= CONSTANT_DEADLOCK_MIN;
+			else right_motor_duty_float *= CONSTANT_DEADLOCK_MAX;
+		}
+		else
+		{
+			if (left_motor_duty_float > 0) left_motor_duty_float *= CONSTANT_DEADLOCK_MIN;
+			else left_motor_duty_float *= CONSTANT_DEADLOCK_MAX;
+			if (right_motor_duty_float > 0) right_motor_duty_float *= CONSTANT_DEADLOCK_MAX;
+			else right_motor_duty_float *= CONSTANT_DEADLOCK_MIN;
+		}
+		deadlock_threshold = DIRECTION_THRESHOLD + 400;
+	}
+	else
+	{
+		deadlock_threshold = DIRECTION_THRESHOLD;
 	}
 
-	if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
+	// left motor value correction
+	if (left_motor_duty_float > 100) left_motor_duty_float = 100;
+	else if (left_motor_duty_float < -100) left_motor_duty_float = -100;
+	else
+	{
+		if (left_motor_duty_float > 0) left_motor_duty_float = 0.6 * left_motor_duty_float + MINIMUM_MOTOR_DUTY;	// instead of 0 to 100, set to 40 to 100 linearly
+		else if (left_motor_duty_float < 0) left_motor_duty_float = 0.6 * left_motor_duty_float - MINIMUM_MOTOR_DUTY;
+	}
+
+
+	// right motor value correction
+	if (right_motor_duty_float > 100) right_motor_duty_float = 100;
+	else if (right_motor_duty_float < -100) right_motor_duty_float = -100;
+	else
+	{
+		if (right_motor_duty_float > 0) right_motor_duty_float = 0.6 * right_motor_duty_float + MINIMUM_MOTOR_DUTY;	// instead of 0 to 100, set to 40 to 100 linearly
+		else if (right_motor_duty_float < 0) right_motor_duty_float = 0.6 * right_motor_duty_float - MINIMUM_MOTOR_DUTY;
+		deadlock_threshold = DIRECTION_THRESHOLD;
+	}
+
+
+	left_motor_duty_int = (int) left_motor_duty_float;
+	right_motor_duty_int = (int) right_motor_duty_float;
 
 	osDelay(10);
   }
@@ -195,12 +226,36 @@ void StartTask_auto_drive(void *argument)
 void StartTask_get_echo_time(void *argument)
 {
   /* USER CODE BEGIN StartTask_get_echo_time */
+  osDelay(100);
   /* Infinite loop */
   for(;;)
   {
-	if (echo_left_fall_time > echo_left_rise_time) echo_left_time_us = echo_left_fall_time - echo_left_rise_time;
-	if (echo_center_fall_time > echo_center_rise_time) echo_center_time_us = echo_center_fall_time - echo_center_rise_time;
-	if (echo_right_fall_time > echo_right_rise_time) echo_right_time_us = echo_right_fall_time - echo_right_rise_time;
+	int echo_left_time_us_temp, echo_center_time_us_temp, echo_right_time_us_temp;
+
+	if (echo_left_fall_time > echo_left_rise_time && SENSOR_VALUE_THRESHOLD) echo_left_time_us_temp = echo_left_fall_time - echo_left_rise_time;
+	if (echo_center_fall_time > echo_center_rise_time) echo_center_time_us_temp = echo_center_fall_time - echo_center_rise_time;
+	if (echo_right_fall_time > echo_right_rise_time) echo_right_time_us_temp = echo_right_fall_time - echo_right_rise_time;
+
+	if (echo_left_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_left_time_queue[echo_left_time_queue_index++] = echo_left_time_us_temp;
+	if (echo_center_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_center_time_queue[echo_center_time_queue_index++] = echo_center_time_us_temp;
+	if (echo_right_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_right_time_queue[echo_right_time_queue_index++] = echo_right_time_us_temp;
+
+	int echo_left_sum = 0, echo_center_sum = 0, echo_right_sum = 0;
+	for (uint8_t i=0; i<VALUE_QUEUE_SIZE; ++i)
+	{
+
+		echo_left_sum += echo_left_time_queue[i];
+		echo_center_sum += echo_center_time_queue[i];
+		echo_right_sum += echo_right_time_queue[i];
+	}
+
+	echo_left_time_us = echo_left_sum / VALUE_QUEUE_SIZE;
+	echo_center_time_us = echo_center_sum / VALUE_QUEUE_SIZE;
+	echo_right_time_us = echo_right_sum / VALUE_QUEUE_SIZE;
+
+	if (echo_left_time_queue_index >= VALUE_QUEUE_SIZE) echo_left_time_queue_index = 0;
+	if (echo_center_time_queue_index >= VALUE_QUEUE_SIZE) echo_center_time_queue_index = 0;
+	if (echo_right_time_queue_index >= VALUE_QUEUE_SIZE) echo_right_time_queue_index = 0;
 
     osDelay(10);
   }
@@ -217,11 +272,12 @@ void StartTask_get_echo_time(void *argument)
 void StartTask_print_sensor_value(void *argument)
 {
   /* USER CODE BEGIN StartTask_print_sensor_value */
+  osDelay(100);
   /* Infinite loop */
   for(;;)
   {
 	printf("%5lu %5lu %5lu  ", echo_left_time_us, echo_center_time_us, echo_right_time_us);
-	printf("L: %+5d R:%+5d\n", left_motor_duty_int_raw, right_motor_duty_int_raw);
+	printf("L: %+5d R:%+5d\n", left_motor_duty_int, right_motor_duty_int);
 
 	arbitrary_turn_right_left = !arbitrary_turn_right_left;
 

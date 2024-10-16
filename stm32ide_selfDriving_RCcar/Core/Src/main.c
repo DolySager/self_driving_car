@@ -73,7 +73,8 @@
 uint8_t rxChar;
 int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
 uint8_t mode_auto_manu = 0;
-uint16_t echo_time_queue[3][10];
+uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_center_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_right_time_queue[VALUE_QUEUE_SIZE] = {0, };
+uint8_t echo_left_time_queue_index = 0, echo_center_time_queue_index = 0, echo_right_time_queue_index = 0;
 uint32_t echo_left_rise_time, echo_left_fall_time;
 uint32_t echo_center_rise_time, echo_center_fall_time;
 uint32_t echo_right_rise_time, echo_right_fall_time;
@@ -81,6 +82,7 @@ float left_motor_duty_float, right_motor_duty_float;
 int left_motor_duty_int, right_motor_duty_int;
 int left_motor_duty_int_raw, right_motor_duty_int_raw;
 uint8_t arbitrary_turn_right_left = 0;
+uint32_t deadlock_threshold = 800;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/

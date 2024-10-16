@@ -42,17 +42,7 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-extern uint8_t rxChar;
-extern int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
-extern uint8_t mode_auto_manu;
-extern uint16_t echo_time_queue[3][10];
-extern uint32_t echo_left_rise_time, echo_left_fall_time;
-extern uint32_t echo_center_rise_time, echo_center_fall_time;
-extern uint32_t echo_right_rise_time, echo_right_fall_time;
-extern float left_motor_duty_float, right_motor_duty_float;
-extern int left_motor_duty_int, right_motor_duty_int;
-extern int left_motor_duty_int_raw, right_motor_duty_int_raw;
-extern uint8_t arbitrary_turn_right_left;
+
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -117,11 +107,37 @@ void Error_Handler(void);
 #define ACTIVE_CHANNEL_ECHO_CENTER HAL_TIM_ACTIVE_CHANNEL_2
 #define ACTIVE_CHANNEL_ECHO_RIGHT HAL_TIM_ACTIVE_CHANNEL_3
 
+#define VALUE_QUEUE_SIZE 5
+
 // Autonomous Drive Constants
-#define TURN_SENSITIVITY 0.25
-#define STRAIGHT_SENSITIVITY 0.025
-#define DIRECTION_THRESHOLD 1500.0
-#define ARBITRARY_TURN_POWER_COMPENSATION 50
+#define K_SAMESIDE	-1.0
+#define K_OPPSIDE	+1.0
+#define K_CENTER	+1.0
+#define MAX_STRAIGHT_SENSOR_VALUE 3000.0
+#define MAX_CURVE_SENSOR_VALUE 5000.0
+#define MINIMUM_MOTOR_DUTY 40.0
+#define DIRECTION_THRESHOLD 600.0
+#define SENSOR_VALUE_THRESHOLD 35000
+#define CURVE_SENSITIVITY_MAX_VALUE 1000.0
+#define	CONSTANT_CALIBRATION_MAX 1.5
+#define CONSTANT_CALIBRATION_MIN 0.9
+#define	CONSTANT_DEADLOCK_MAX 2
+#define CONSTANT_DEADLOCK_MIN 0.5
+
+extern uint8_t rxChar;
+extern int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
+extern uint8_t mode_auto_manu;
+extern uint16_t echo_time_queue[3][10];
+extern uint32_t echo_left_rise_time, echo_left_fall_time;
+extern uint32_t echo_center_rise_time, echo_center_fall_time;
+extern uint32_t echo_right_rise_time, echo_right_fall_time;
+extern float left_motor_duty_float, right_motor_duty_float;
+extern int left_motor_duty_int, right_motor_duty_int;
+extern int left_motor_duty_int_raw, right_motor_duty_int_raw;
+extern uint8_t arbitrary_turn_right_left;
+extern uint32_t deadlock_threshold;
+extern uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE], echo_center_time_queue[VALUE_QUEUE_SIZE], echo_right_time_queue[VALUE_QUEUE_SIZE];
+extern uint8_t echo_left_time_queue_index, echo_center_time_queue_index, echo_right_time_queue_index;
 
 /* USER CODE END Private defines */
 

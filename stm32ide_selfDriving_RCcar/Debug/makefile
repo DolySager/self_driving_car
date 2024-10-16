@@ -64,8 +64,8 @@ all: main-build
 main-build: selfDriving_RCcar.elf secondary-outputs
 
 # Tool invocations
-selfDriving_RCcar.elf selfDriving_RCcar.map: $(OBJS) $(USER_OBJS) D:\lany_workspace\Git\self_driving_car\stm32ide_selfDriving_RCcar\STM32F411RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "selfDriving_RCcar.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\lany_workspace\Git\self_driving_car\stm32ide_selfDriving_RCcar\STM32F411RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="selfDriving_RCcar.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+selfDriving_RCcar.elf selfDriving_RCcar.map: $(OBJS) $(USER_OBJS) C:\Users\guest_A\Git\self_driving_car\stm32ide_selfDriving_RCcar\STM32F411RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "selfDriving_RCcar.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\guest_A\Git\self_driving_car\stm32ide_selfDriving_RCcar\STM32F411RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="selfDriving_RCcar.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
