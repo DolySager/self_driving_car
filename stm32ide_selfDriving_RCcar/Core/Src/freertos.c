@@ -151,10 +151,11 @@ float pid_process (float current_value, float target_value, float kp, float ki, 
 #define LEFT_MOTOR_MIN_SPEED 36
 #define RIGHT_MOTOR_MIN_SPEED 34
 #define STRAIGHT_SENSOR_VALUE_AT_MAX_SPEED 2000
-#define STRAIGHT_SENSOR_VALUE_THRESHOLD 500
+#define STRAIGHT_SENSOR_VALUE_THRESHOLD 300
 #define CURVE_SENSOR_VALUE_AT_MAX_SPEED 3000
 #define MOTOR_ERROR_PERCENTAGE_TOLERANCE 5
 #define DEADLOCK_THRESHOLD_VALUE 500
+#define SAMPLE_TIME_S 0.01
 float center_integral = 0, center_prev_value = 0;
 float curve_integral_left = 0, curve_prev_value_left = 0;
 float curve_integral_right = 0, curve_prev_value_right = 0;
@@ -173,7 +174,7 @@ void StartTask_auto_drive(void *argument)
 		if (!mode_deadlock_normal)
 		{
 			mode_deadlock_normal = 1;
-			deadlock_threshold = STRAIGHT_SENSOR_VALUE_THRESHOLD + 300;
+			deadlock_threshold = STRAIGHT_SENSOR_VALUE_THRESHOLD + 500;
 		}
 	}
 	// reject sensor value if it is touching wall
@@ -189,7 +190,7 @@ void StartTask_auto_drive(void *argument)
 	float left_motor_straight, left_motor_curve, right_motor_straight, right_motor_curve;
 
 	// Straight speed calculate
-	left_motor_straight = pid_process (echo_center_time_us, STRAIGHT_SENSOR_VALUE_THRESHOLD, -1, -0, -0.00001, 0.01, &center_integral, &center_prev_value);
+	left_motor_straight = pid_process (echo_center_time_us, STRAIGHT_SENSOR_VALUE_THRESHOLD, -1, -0, -0.000001, SAMPLE_TIME_S, &center_integral, &center_prev_value);
 	right_motor_straight = left_motor_straight;
 
 	// adjust sensor value to percentage
@@ -222,8 +223,8 @@ void StartTask_auto_drive(void *argument)
 	}
 	else
 	{
-		left_motor_curve = pid_process (curve_current_value, 0, 0.5, 0, 0.0001, 0.01, &curve_integral_left, &curve_prev_value_left);
-		right_motor_curve = pid_process (curve_current_value, 0, -0.5, -0, -0.0001, 0.01, &curve_integral_right, &curve_prev_value_right);
+		left_motor_curve = pid_process (curve_current_value, 0, 0.59, 0, 0.0000001, SAMPLE_TIME_S, &curve_integral_left, &curve_prev_value_left);
+		right_motor_curve = pid_process (curve_current_value, 0, -0.59, -0, -0.0000001, SAMPLE_TIME_S, &curve_integral_right, &curve_prev_value_right);
 
 		// adjust sensor value to percentage
 		left_motor_curve = left_motor_curve / CURVE_SENSOR_VALUE_AT_MAX_SPEED * 100;
@@ -276,7 +277,7 @@ void StartTask_auto_drive(void *argument)
 
 	if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
 
-	osDelay(10);
+	osDelay(SAMPLE_TIME_S * 1000);
   }
   /* USER CODE END StartTask_auto_drive */
 }
@@ -322,7 +323,7 @@ void StartTask_get_echo_time(void *argument)
 	if (echo_center_time_queue_index >= VALUE_QUEUE_SIZE) echo_center_time_queue_index = 0;
 	if (echo_right_time_queue_index >= VALUE_QUEUE_SIZE) echo_right_time_queue_index = 0;
 
-    osDelay(10);
+    osDelay(SAMPLE_TIME_S * 1000);
   }
   /* USER CODE END StartTask_get_echo_time */
 }
