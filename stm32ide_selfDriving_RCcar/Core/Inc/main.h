@@ -110,23 +110,11 @@ void Error_Handler(void);
 #define VALUE_QUEUE_SIZE 5
 
 // Autonomous Drive Constants
-#define K_SAMESIDE	-1.0
-#define K_OPPSIDE	+1.0
-#define K_CENTER	+1.0
-#define MAX_STRAIGHT_SENSOR_VALUE 3000.0
-#define MAX_CURVE_SENSOR_VALUE 5000.0
-#define MINIMUM_MOTOR_DUTY 40.0
-#define DIRECTION_THRESHOLD 600.0
-#define SENSOR_VALUE_THRESHOLD 35000
-#define CURVE_SENSITIVITY_MAX_VALUE 1000.0
-#define	CONSTANT_CALIBRATION_MAX 1.5
-#define CONSTANT_CALIBRATION_MIN 0.9
-#define	CONSTANT_DEADLOCK_MAX 2
-#define CONSTANT_DEADLOCK_MIN 0.5
+#define SENSOR_VALUE_THRESHOLD 30000
 
 extern uint8_t rxChar;
 extern int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
-extern uint8_t mode_auto_manu;
+extern uint8_t mode_auto_manu, mode_deadlock_normal;
 extern uint16_t echo_time_queue[3][10];
 extern uint32_t echo_left_rise_time, echo_left_fall_time;
 extern uint32_t echo_center_rise_time, echo_center_fall_time;

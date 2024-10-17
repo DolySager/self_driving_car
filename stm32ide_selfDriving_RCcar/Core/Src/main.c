@@ -72,7 +72,7 @@
 /* USER CODE BEGIN PV */
 uint8_t rxChar;
 int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
-uint8_t mode_auto_manu = 0;
+uint8_t mode_auto_manu = 0, mode_deadlock_normal = 0;
 uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_center_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_right_time_queue[VALUE_QUEUE_SIZE] = {0, };
 uint8_t echo_left_time_queue_index = 0, echo_center_time_queue_index = 0, echo_right_time_queue_index = 0;
 uint32_t echo_left_rise_time, echo_left_fall_time;

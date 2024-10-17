@@ -30,12 +30,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	{
 		switch (rxChar)
 		{
+		/*
 		case 'F':
 			if (!mode_auto_manu) RCcar_go_forward(100);
 			break;
 		case 'B':
 			if (!mode_auto_manu) RCcar_go_backward(100);
 			break;
+		*/
 		case 'L':
 			if (!mode_auto_manu) RCcar_go_soft_left(100);
 			break;
@@ -48,6 +50,18 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			break;
 		case '0':
 			if (!mode_auto_manu) RCcar_stop();
+			break;
+		case 'U':
+			++right_motor_duty_int;
+			break;
+		case 'D':
+			--right_motor_duty_int;
+			break;
+		case 'F':
+			++left_motor_duty_int;
+			break;
+		case 'B':
+			--left_motor_duty_int;
 			break;
 		}
 	}
