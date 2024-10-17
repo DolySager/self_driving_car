@@ -1,5 +1,6 @@
 # STM32IDE specific
 *.cyclo
+*.list
 
 # Prerequisites
 *.d
