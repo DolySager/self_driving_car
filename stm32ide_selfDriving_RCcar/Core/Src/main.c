@@ -70,9 +70,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t rxChar;
+char rxBuffer[20];
 int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
-uint8_t mode_auto_manu = 0, mode_deadlock_normal = 0;
+uint8_t mode_auto_manu = 0, mode_deadlock_normal = 0, mode_monitor_on_off = 0;
 uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_center_time_queue[VALUE_QUEUE_SIZE] = {0, }, echo_right_time_queue[VALUE_QUEUE_SIZE] = {0, };
 uint8_t echo_left_time_queue_index = 0, echo_center_time_queue_index = 0, echo_right_time_queue_index = 0;
 uint32_t echo_left_rise_time, echo_left_fall_time;
@@ -83,6 +83,8 @@ int left_motor_duty_int, right_motor_duty_int;
 int left_motor_duty_int_raw, right_motor_duty_int_raw;
 uint8_t arbitrary_turn_right_left = 0;
 uint32_t deadlock_threshold = 800;
+float kps = 1, kis = 0, kds = 0, kpc = 1, kic = 0, kdc = 0;
+float center_integral, curve_integral_left, curve_integral_right;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -161,7 +163,9 @@ int main(void)
   HAL_TIM_IC_Start_DMA(&htim_echoMeasure_2, CHANNEL_ECHO_RIGHT_RISING, &echo_right_rise_time, 1);
   HAL_TIM_IC_Start_DMA(&htim_echoMeasure_2, CHANNEL_ECHO_RIGHT_FALLING, &echo_right_fall_time, 1);
 
-  HAL_UART_Receive_DMA(&huart_bluetooth, &rxChar, 1);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart_bluetooth, (uint8_t*) rxBuffer, 20);
+
+  printf("Program start\n");
   /* USER CODE END 2 */
 
   /* Init scheduler */

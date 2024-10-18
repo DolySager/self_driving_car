@@ -23,49 +23,117 @@
 /* USER CODE BEGIN 0 */
 extern void RCcar_analogStick(uint8_t x, uint8_t y);
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-	// Android arduino bluetooth controller app
-	if (huart == &huart_bluetooth)
+	// RxEventCallback is called for two times per Rx: receive complete and Half complete.
+	// Below code reject half complete callback.
+	if (HAL_UARTEx_GetRxEventType(huart) == HAL_UART_RXEVENT_IDLE)
 	{
-		switch (rxChar)
+		// Android arduino bluetooth controller app
+		if (huart == &huart_bluetooth)
 		{
-		/*
-		case 'F':
-			if (!mode_auto_manu) RCcar_go_forward(100);
-			break;
-		case 'B':
-			if (!mode_auto_manu) RCcar_go_backward(100);
-			break;
-		*/
-		case 'L':
-			if (!mode_auto_manu) RCcar_go_soft_left(100);
-			break;
-		case 'R':
-			if (!mode_auto_manu) RCcar_go_soft_right(100);
-			break;
-		case 'A':
-			mode_auto_manu = !mode_auto_manu;
-			if (!mode_auto_manu) RCcar_stop();
-			break;
-		case '0':
-			if (!mode_auto_manu) RCcar_stop();
-			break;
-		case 'U':
-			++right_motor_duty_int;
-			break;
-		case 'D':
-			--right_motor_duty_int;
-			break;
-		case 'F':
-			++left_motor_duty_int;
-			break;
-		case 'B':
-			--left_motor_duty_int;
-			break;
-		}
-	}
 
+			if (Size == 1)
+			{
+				switch (rxBuffer[0])
+				{
+				case 'F':
+					if (!mode_auto_manu) RCcar_go_forward(100);
+					break;
+				case 'B':
+					if (!mode_auto_manu) RCcar_go_backward(100);
+					break;
+				case 'L':
+					if (!mode_auto_manu) RCcar_go_soft_left(100);
+					break;
+				case 'R':
+					if (!mode_auto_manu) RCcar_go_soft_right(100);
+					break;
+				case 'A':
+
+					break;
+				case '0':
+					if (!mode_auto_manu) RCcar_stop();
+					break;
+				}
+			}
+			else /* sentence command */
+			{
+				printf("REMOTE> ");
+				char *token = strtok(rxBuffer, " \n\r");
+				if (!strcmp(token, "mode"))
+				{
+					mode_auto_manu = !mode_auto_manu;
+					if (mode_auto_manu) printf("Autonomous Mode");
+					else printf("Manual Mode");
+					if (!mode_auto_manu) RCcar_stop();
+					center_integral = 0;
+					curve_integral_left = 0;
+					curve_integral_right = 0;
+				}
+				else if (!strcmp(token, "set"))
+				{
+					token = strtok(NULL, " \n\r");
+					float num = atof(strtok(NULL, " \n\r"));
+					if (!strcmp(token, "kps"))
+					{
+						kps = num;
+						printf("kps set to %.5f", num);
+					}
+					else if (!strcmp(token, "kis"))
+					{
+						kis = num;
+						printf("kis set to %.5f", num);
+					}
+					else if (!strcmp(token, "kds"))
+					{
+						kds = num;
+						printf("kds set to %.5f", num);
+					}
+					else if (!strcmp(token, "kpc"))
+					{
+						kpc = num;
+						printf("kpc set to %.5f", num);
+					}
+					else if (!strcmp(token, "kic"))
+					{
+						kic = num;
+						printf("kic set to %.5f", num);
+					}
+					else if (!strcmp(token, "kdc"))
+					{
+						kdc = num;
+						printf("kdc set to %.5f", num);
+					}
+					else
+					{
+						printf("Command Error");
+					}
+				}
+				else if (!strcmp(token, "show"))
+				{
+					printf("\nkps %.5f kis %.5f kds %.5f\nkpc %.5f kic %.5f kdc %.5f", kps, kis, kds, kpc, kic, kdc);
+				}
+				else if (!strcmp(token, "monitor"))
+				{
+					mode_monitor_on_off = !mode_monitor_on_off;
+					if (mode_monitor_on_off) printf("monitor on");
+					else printf("monitor off");
+				}
+				else
+				{
+					printf("Command Error");
+				}
+				printf("\n");
+			}
+
+		}
+		for (uint8_t i=0; i<Size; ++i)
+		{
+			rxBuffer[i] = 0;
+		}
+		HAL_UARTEx_ReceiveToIdle_DMA(huart, (uint8_t*) rxBuffer, 20);
+	}
 }
 /* USER CODE END 0 */
 
@@ -173,7 +241,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_usart1_rx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_usart1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_usart1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_usart1_rx.Init.Mode = DMA_CIRCULAR;
+    hdma_usart1_rx.Init.Mode = DMA_NORMAL;
     hdma_usart1_rx.Init.Priority = DMA_PRIORITY_LOW;
     hdma_usart1_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_usart1_rx) != HAL_OK)

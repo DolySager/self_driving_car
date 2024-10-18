@@ -112,10 +112,9 @@ void Error_Handler(void);
 // Autonomous Drive Constants
 #define SENSOR_VALUE_THRESHOLD 30000
 
-extern uint8_t rxChar;
+extern char rxBuffer[20];
 extern int32_t echo_left_time_us, echo_center_time_us, echo_right_time_us;
-extern uint8_t mode_auto_manu, mode_deadlock_normal;
-extern uint16_t echo_time_queue[3][10];
+extern uint8_t mode_auto_manu, mode_deadlock_normal, mode_monitor_on_off;
 extern uint32_t echo_left_rise_time, echo_left_fall_time;
 extern uint32_t echo_center_rise_time, echo_center_fall_time;
 extern uint32_t echo_right_rise_time, echo_right_fall_time;
@@ -126,6 +125,8 @@ extern uint8_t arbitrary_turn_right_left;
 extern uint32_t deadlock_threshold;
 extern uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE], echo_center_time_queue[VALUE_QUEUE_SIZE], echo_right_time_queue[VALUE_QUEUE_SIZE];
 extern uint8_t echo_left_time_queue_index, echo_center_time_queue_index, echo_right_time_queue_index;
+extern float kps, kis, kds, kpc, kic, kdc;
+extern float center_integral, curve_integral_left, curve_integral_right;
 
 /* USER CODE END Private defines */
 
