@@ -138,6 +138,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 					else if (!strcmp(token, "dl"))
 					{
 						deadlock_threshold_value = num;
+						if (!mode_deadlock_normal) deadlock_threshold = deadlock_threshold_value * 2;
+						else deadlock_threshold = deadlock_threshold_value;
 						printf("deadlock distance set to %.5f", num);
 					}
 					else

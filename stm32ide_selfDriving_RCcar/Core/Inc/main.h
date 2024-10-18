@@ -109,6 +109,8 @@ void Error_Handler(void);
 
 #define VALUE_QUEUE_SIZE 5
 
+#define INTEGRAL_ARR_NUM 10
+
 // Autonomous Drive Constants
 #define SENSOR_VALUE_THRESHOLD 30000
 
@@ -128,7 +130,8 @@ extern uint8_t echo_left_time_queue_index, echo_center_time_queue_index, echo_ri
 extern float kps, kis, kds;
 extern float kpl, kil, kdl;
 extern float kpr, kir, kdr;
-extern float integral_straight, integral_left, integral_right;
+float integral_straight_arr[INTEGRAL_ARR_NUM], integral_left_arr[INTEGRAL_ARR_NUM], integral_right_arr[INTEGRAL_ARR_NUM];
+uint8_t integral_straight_index, integral_left_index, integral_right_index;
 extern float opposite_constant;
 extern float sensor_value_max_speed, sensor_value_dir_change, deadlock_threshold_value;
 

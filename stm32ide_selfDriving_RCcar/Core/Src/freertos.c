@@ -133,13 +133,18 @@ void MX_FREERTOS_Init(void) {
 * @retval None
 */
 // positive error means positive motor power. target and current value position swapped.
-#define INTEGRAL_ACCUM_MAX 2000
-float pid_process (float current_value, float target_value, float kp, float ki, float kd, float dt, float* integral_ptr, float* prev_value_ptr)
+float pid_process (float current_value, float target_value, float kp, float ki, float kd, float dt, float* integral_arr_ptr, uint8_t* integral_index_ptr, float* prev_value_ptr)
 {
 	float error = current_value - target_value;
 	float p_term = kp * error;
-	if (*integral_ptr < INTEGRAL_ACCUM_MAX) *integral_ptr += error * dt;
-	float i_term = ki * *integral_ptr;
+	integral_arr_ptr[integral_index_ptr] = error * dt;
+	if (*integral_index_ptr > INTEGRAL_ARR_NUM) *integral_index_ptr = 0;
+	float integral_sum = 0;
+	for (uint8_t i=0; i<INTEGRAL_ARR_NUM; ++i)
+	{
+		integral_sum += integral_arr_ptr[i];
+	}
+	float i_term = ki * integral_sum;
 	float d_term = kd * (current_value - *prev_value_ptr) / dt;
 	*prev_value_ptr = current_value;
 
@@ -160,8 +165,9 @@ float prev_value_straight = 0, prev_value_left = 0, prev_value_right = 0;
 void StartTask_auto_drive(void *argument)
 {
 	/* USER CODE BEGIN StartTask_auto_drive */
-	deadlock_threshold = deadlock_threshold_value;
+
 	osDelay(1000);
+	deadlock_threshold = deadlock_threshold_value;
 	/* Infinite loop */
 	for(;;)
 	{
@@ -240,9 +246,9 @@ void StartTask_auto_drive(void *argument)
 			// Normal operation
 			else
 			{
-				straight_power = pid_process (echo_center_time_us_trunc, sensor_value_dir_change, kps, kis, kds, SAMPLE_TIME_S, &integral_straight, &prev_value_straight);
-				left_power = pid_process (echo_right_time_us_trunc, sensor_value_dir_change, kpl, kil, kdl, SAMPLE_TIME_S, &integral_left, &prev_value_left);
-				right_power = pid_process (echo_left_time_us_trunc, sensor_value_dir_change, kpr, kir, kdr, SAMPLE_TIME_S, &integral_right, &prev_value_right);
+				straight_power = pid_process (echo_center_time_us_trunc, sensor_value_dir_change, kps, kis, kds, SAMPLE_TIME_S, integral_straight_arr, &integral_straight_index, &prev_value_straight);
+				left_power = pid_process (echo_right_time_us_trunc, sensor_value_dir_change, kpl, kil, kdl, SAMPLE_TIME_S, integral_left_arr, &integral_left_index, &prev_value_left);
+				right_power = pid_process (echo_left_time_us_trunc, sensor_value_dir_change, kpr, kir, kdr, SAMPLE_TIME_S, integral_right_arr, &integral_right_index, &prev_value_right);
 			}
 
 			opposite_left_power = left_power * opposite_constant;
@@ -256,13 +262,15 @@ void StartTask_auto_drive(void *argument)
 			left_motor_duty_float = float_abs(straight_power) / left_weight_sum * straight_power + float_abs(left_power) / left_weight_sum * left_power - float_abs(opposite_right_power) / left_weight_sum * opposite_right_power;
 			right_motor_duty_float = float_abs(straight_power) / right_weight_sum * straight_power + float_abs(right_power) / right_weight_sum * right_power - float_abs(opposite_left_power) / right_weight_sum * opposite_left_power;
 
+			float sensor_max_value = sensor_value_max_speed - sensor_value_dir_change;
+
 			// motor value normalize to percentage
 			if (left_motor_duty_float < 1 &&  left_motor_duty_float > -1) left_motor_duty_float = 0;
-			else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) + 43;
-			else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) - 43;
+			else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / sensor_max_value * (100 - 43) + 43;
+			else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / sensor_max_value * (100 - 43) - 43;
 			if (right_motor_duty_float < 1 &&  right_motor_duty_float > -1) right_motor_duty_float = 0;
-			else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) + 43;
-			else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) - 43;
+			else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / sensor_max_value * (100 - 43) + 43;
+			else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / sensor_max_value * (100 - 43) - 43;
 
 			// convert to integer value
 			left_motor_duty_int = (int) left_motor_duty_float;

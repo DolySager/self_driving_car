@@ -82,11 +82,12 @@ float left_motor_duty_float, right_motor_duty_float;
 int left_motor_duty_int, right_motor_duty_int;
 int left_motor_duty_int_raw, right_motor_duty_int_raw;
 uint8_t arbitrary_turn_right_left = 0;
-uint32_t deadlock_threshold = 800;
+uint32_t deadlock_threshold;
 float kps = 1, kis = 0, kds = 0;
 float kpl = 1, kil = 0, kdl = 0;
 float kpr = 1, kir = 0, kdr = 0;
-float integral_straight = 0, integral_left = 0, integral_right;
+float integral_straight_arr[INTEGRAL_ARR_NUM] = {0, }, integral_left_arr[INTEGRAL_ARR_NUM] = {0, }, integral_right_arr[INTEGRAL_ARR_NUM] = {0, };
+uint8_t integral_straight_index = 0, integral_left_index = 0, integral_right_index = 0;
 float opposite_constant = 1;
 float sensor_value_max_speed = 2000, sensor_value_dir_change = 600, deadlock_threshold_value = 400;
 
