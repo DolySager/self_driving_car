@@ -67,9 +67,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 					if (mode_auto_manu) printf("Autonomous Mode");
 					else printf("Manual Mode");
 					if (!mode_auto_manu) RCcar_stop();
-					integral_straight = 0;
-					integral_left = 0;
-					integral_right = 0;
 				}
 				else if (!strcmp(token, "set"))
 				{

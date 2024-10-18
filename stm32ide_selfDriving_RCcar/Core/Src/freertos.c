@@ -137,7 +137,7 @@ float pid_process (float current_value, float target_value, float kp, float ki, 
 {
 	float error = current_value - target_value;
 	float p_term = kp * error;
-	integral_arr_ptr[integral_index_ptr] = error * dt;
+	integral_arr_ptr[*integral_index_ptr] = error * dt;
 	if (*integral_index_ptr > INTEGRAL_ARR_NUM) *integral_index_ptr = 0;
 	float integral_sum = 0;
 	for (uint8_t i=0; i<INTEGRAL_ARR_NUM; ++i)
@@ -202,22 +202,30 @@ void StartTask_auto_drive(void *argument)
 			// DEADLOCK DETECTION //
 			////////////////////////
 
+			float center_to_left = float_abs(echo_center_time_us_trunc - echo_left_time_us_trunc);
+			float center_to_right = float_abs(echo_right_time_us_trunc - echo_left_time_us_trunc);
 			if ((echo_left_time_us_trunc < deadlock_threshold) && (echo_center_time_us_trunc < deadlock_threshold) && (echo_right_time_us_trunc < deadlock_threshold))
 			{
-				if (!mode_deadlock_normal)
+				if (center_to_left < (deadlock_threshold / 20) && center_to_right < (deadlock_threshold / 20))
 				{
+					if (!mode_deadlock_normal)
+					{
+						if (mode_monitor_on_off) printf("Deadlock mode on\n");
+						arbitrary_turn_right_left = !arbitrary_turn_right_left;
+					}
 					mode_deadlock_normal = 1;
-					if (mode_monitor_on_off) printf("Deadlock mode on\n");
-					deadlock_threshold = deadlock_threshold_value * 2;
+					deadlock_threshold = deadlock_threshold_value * 1.5;
 				}
 			}
-			// reject sensor value if it is touching wall
-			else if (echo_left_time_us_trunc > deadlock_threshold && echo_center_time_us_trunc > deadlock_threshold && echo_right_time_us_trunc > deadlock_threshold)
+			else
 			{
-				if (mode_deadlock_normal)
+				if (center_to_left > (deadlock_threshold / 20) || center_to_right > (deadlock_threshold / 20))
 				{
+					if (mode_deadlock_normal)
+					{
+						if (mode_monitor_on_off) printf("Deadlock mode off\n");
+					}
 					mode_deadlock_normal = 0;
-					if (mode_monitor_on_off) printf("Deadlock mode off\n");
 					deadlock_threshold = deadlock_threshold_value;
 				}
 			}
@@ -226,20 +234,21 @@ void StartTask_auto_drive(void *argument)
 			// AUTO-DRIVE //
 			////////////////
 
+			float sensor_max_value = sensor_value_max_speed - sensor_value_dir_change;
+
 			// Hard-coded value if deadlocked
 			if (mode_deadlock_normal)
 			{
-				straight_power = -100;
 				if (arbitrary_turn_right_left)
 				{
-					left_power = 100;
-					right_power = -100;
+					left_motor_duty_float = 0;
+					right_motor_duty_float = -1 * sensor_max_value;
 
 				}
 				else
 				{
-					left_power = -100;
-					right_power = 100;
+					left_motor_duty_float = -1 * sensor_max_value;
+					right_motor_duty_float = 0;
 				}
 			}
 
@@ -249,20 +258,29 @@ void StartTask_auto_drive(void *argument)
 				straight_power = pid_process (echo_center_time_us_trunc, sensor_value_dir_change, kps, kis, kds, SAMPLE_TIME_S, integral_straight_arr, &integral_straight_index, &prev_value_straight);
 				left_power = pid_process (echo_right_time_us_trunc, sensor_value_dir_change, kpl, kil, kdl, SAMPLE_TIME_S, integral_left_arr, &integral_left_index, &prev_value_left);
 				right_power = pid_process (echo_left_time_us_trunc, sensor_value_dir_change, kpr, kir, kdr, SAMPLE_TIME_S, integral_right_arr, &integral_right_index, &prev_value_right);
+
+				// The less angle difference, the more straight power
+				float angle_diff_percent = float_abs(left_power - right_power)/ sensor_max_value;
+				left_power *= angle_diff_percent;
+				right_power *= angle_diff_percent;
+				straight_power *= (1-angle_diff_percent);
+
+				opposite_left_power = left_power * opposite_constant;
+				opposite_right_power = right_power * opposite_constant;
+
+				// sum of weigth calculation
+				left_weight_sum = float_abs(straight_power) + float_abs(left_power) + float_abs(opposite_right_power);
+				right_weight_sum = float_abs(straight_power) + float_abs(right_power) + float_abs(opposite_left_power);
+
+				// Get motor power. The more value, the more weight
+				float left_motor_straight_power = float_abs(straight_power) / left_weight_sum * straight_power;
+				float left_motor_curve_power = float_abs(left_power) / left_weight_sum * left_power - float_abs(opposite_right_power) / left_weight_sum * opposite_right_power;
+				float right_motor_straight_power = float_abs(straight_power) / right_weight_sum * straight_power;
+				float right_motor_curve_power = float_abs(right_power) / right_weight_sum * right_power - float_abs(opposite_left_power) / right_weight_sum * opposite_left_power;
+
+				left_motor_duty_float = left_motor_straight_power + left_motor_curve_power;
+				right_motor_duty_float = right_motor_straight_power + right_motor_curve_power;
 			}
-
-			opposite_left_power = left_power * opposite_constant;
-			opposite_right_power = right_power * opposite_constant;
-
-			// sum of weigth calculation
-			left_weight_sum = float_abs(straight_power) + float_abs(left_power) + float_abs(opposite_right_power);
-			right_weight_sum = float_abs(straight_power) + float_abs(right_power) + float_abs(opposite_left_power);
-
-			// Get motor power. The more value, the more weight
-			left_motor_duty_float = float_abs(straight_power) / left_weight_sum * straight_power + float_abs(left_power) / left_weight_sum * left_power - float_abs(opposite_right_power) / left_weight_sum * opposite_right_power;
-			right_motor_duty_float = float_abs(straight_power) / right_weight_sum * straight_power + float_abs(right_power) / right_weight_sum * right_power - float_abs(opposite_left_power) / right_weight_sum * opposite_left_power;
-
-			float sensor_max_value = sensor_value_max_speed - sensor_value_dir_change;
 
 			// motor value normalize to percentage
 			if (left_motor_duty_float < 1 &&  left_motor_duty_float > -1) left_motor_duty_float = 0;
@@ -349,8 +367,6 @@ void StartTask_print_sensor_value(void *argument)
 		  printf("%5lu %5lu %5lu || ", echo_left_time_us, echo_center_time_us, echo_right_time_us);
 		  printf("L: %+3d R:%+3d\n", left_motor_duty_int, right_motor_duty_int);
 	  }
-
-	  arbitrary_turn_right_left = !arbitrary_turn_right_left;
 
 	  osDelay(1000);
   }
