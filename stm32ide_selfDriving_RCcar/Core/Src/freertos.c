@@ -132,9 +132,10 @@ void MX_FREERTOS_Init(void) {
 * @param argument: Not used
 * @retval None
 */
+// positive error means positive motor power. target and current value position swapped.
 float pid_process (float current_value, float target_value, float kp, float ki, float kd, float dt, float* integral_ptr, float* prev_value_ptr)
 {
-	float error = target_value - current_value;
+	float error = current_value - target_value;
 	float p_term = kp * error;
 	*integral_ptr += error * dt;
 	float i_term = ki * *integral_ptr;
@@ -144,12 +145,8 @@ float pid_process (float current_value, float target_value, float kp, float ki, 
 	return p_term + i_term - d_term;
 }
 
-#define LEFT_MOTOR_MIN_SPEED 36
-#define RIGHT_MOTOR_MIN_SPEED 34
-#define STRAIGHT_SENSOR_VALUE_AT_MAX_SPEED 2000
-#define STRAIGHT_SENSOR_VALUE_THRESHOLD 600
-#define CURVE_SENSOR_VALUE_AT_MAX_SPEED 2000
-#define CURVE_SENSOR_VALUE_THRESHOLD 800
+#define SENSOR_VALUE_AT_MAX_SPEED 2000
+#define SENSOR_VALUE_AT_DIR_CHANGE 600
 #define MOTOR_ERROR_PERCENTAGE_TOLERANCE 5
 #define DEADLOCK_THRESHOLD_VALUE 400
 #define SAMPLE_TIME_S 0.01
@@ -157,135 +154,143 @@ float center_prev_value = 0, curve_prev_value_left = 0, curve_prev_value_right =
 /* USER CODE END Header_StartTask_auto_drive */
 void StartTask_auto_drive(void *argument)
 {
-  /* USER CODE BEGIN StartTask_auto_drive */
+	/* USER CODE BEGIN StartTask_auto_drive */
 	deadlock_threshold = DEADLOCK_THRESHOLD_VALUE;
 	osDelay(1000);
 	/* Infinite loop */
 	for(;;)
 	{
-	  if (mode_auto_manu || mode_monitor_on_off)
-	  {
-		// deadlock escape mode if cornered
-		if ((echo_left_time_us_limited < deadlock_threshold) && (echo_center_time_us_limited < deadlock_threshold) && (echo_right_time_us_limited < deadlock_threshold))
+		//////////////////////////
+		// VARIABLE DECLARATION //
+		//////////////////////////
+
+		// Sensor value truncated
+		float echo_left_time_us_trunc, echo_center_time_us_trunc, echo_right_time_us_trunc;
+
+		// Straight direction motor power
+		float straight_power;
+		float straight_weight;
+
+		// One-side motor power
+		float left_side_power, right_side_power;
+		float left_side_weight, right_side_weight;
+
+		// Side-distance-difference motor power
+		float diff_power;
+		float diff_weight;
+
+		// sum for weight calculation
+		float left_motor_power_sum, right_motor_power_sum;
+
+		if (mode_auto_manu || mode_monitor_on_off)
 		{
-			if (!mode_deadlock_normal)
+			///////////////////////////
+			// SENSOR VALUE TRUNCATE //
+			///////////////////////////
+
+			if (echo_left_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_left_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			else echo_left_time_us_trunc = echo_left_time_us;
+			if (echo_center_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_center_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			else echo_center_time_us_trunc = echo_center_time_us;
+			if (echo_right_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_right_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			else echo_right_time_us_trunc = echo_right_time_us;
+
+
+			////////////////////////
+			// DEADLOCK DETECTION //
+			////////////////////////
+
+			if ((echo_left_time_us_trunc < deadlock_threshold) && (echo_center_time_us_trunc < deadlock_threshold) && (echo_right_time_us_trunc < deadlock_threshold))
 			{
-				mode_deadlock_normal = 1;
-				if (mode_monitor_on_off) printf("Deadlock mode on\n");
-				deadlock_threshold = DEADLOCK_THRESHOLD_VALUE * 2;
+				if (!mode_deadlock_normal)
+				{
+					mode_deadlock_normal = 1;
+					if (mode_monitor_on_off) printf("Deadlock mode on\n");
+					deadlock_threshold = DEADLOCK_THRESHOLD_VALUE * 2;
+				}
 			}
-		}
-		// reject sensor value if it is touching wall
-		else if (echo_left_time_us_limited > deadlock_threshold && echo_center_time_us_limited > deadlock_threshold && echo_right_time_us_limited > deadlock_threshold)
-		{
+			// reject sensor value if it is touching wall
+			else if (echo_left_time_us_trunc > deadlock_threshold && echo_center_time_us_trunc > deadlock_threshold && echo_right_time_us_trunc > deadlock_threshold)
+			{
+				if (mode_deadlock_normal)
+				{
+					mode_deadlock_normal = 0;
+					if (mode_monitor_on_off) printf("Deadlock mode off\n");
+					deadlock_threshold = SENSOR_VALUE_AT_DIR_CHANGE;
+				}
+			}
+
+			////////////////
+			// AUTO-DRIVE //
+			////////////////
+
+			// Hard-coded value if deadlocked
 			if (mode_deadlock_normal)
 			{
-				mode_deadlock_normal = 0;
-				if (mode_monitor_on_off) printf("Deadlock mode off\n");
-				deadlock_threshold = STRAIGHT_SENSOR_VALUE_THRESHOLD;
+				straight_power = -50;
+				diff_power = -100;
+				if (arbitrary_turn_right_left)
+				{
+					left_side_power = 100;
+					right_side_power = -100;
+
+				}
+				else
+				{
+					left_side_power = -100;
+					right_side_power = 100;
+				}
 			}
-		}
 
-		float left_motor_straight, left_motor_curve, right_motor_straight, right_motor_curve;
-
-		// Straight speed calculate
-		left_motor_straight = pid_process (echo_center_time_us_limited, STRAIGHT_SENSOR_VALUE_THRESHOLD, -1 * kps, -1 * kis, -1 * kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
-		right_motor_straight = left_motor_straight;
-
-		// adjust sensor value to percentage
-		left_motor_straight = left_motor_straight / STRAIGHT_SENSOR_VALUE_AT_MAX_SPEED * 100;
-		right_motor_straight = right_motor_straight / STRAIGHT_SENSOR_VALUE_AT_MAX_SPEED * 100;
-
-		// truncate if above 100
-		if (left_motor_straight > 100) left_motor_straight = 100;
-		else if (left_motor_straight < -100) left_motor_straight = -100;
-		if (right_motor_straight > 100) right_motor_straight = 100;
-		else if (right_motor_straight < -100) right_motor_straight = -100;
-
-		// Curve speed calculate (if deadlocked, force curve value to hard curve)
-		float curve_current_value = echo_left_time_us_limited - echo_right_time_us_limited;
-		if (curve_current_value > CURVE_SENSOR_VALUE_AT_MAX_SPEED) curve_current_value = CURVE_SENSOR_VALUE_AT_MAX_SPEED;
-		else if (curve_current_value < -1 * CURVE_SENSOR_VALUE_AT_MAX_SPEED) curve_current_value = -1 * CURVE_SENSOR_VALUE_AT_MAX_SPEED;
-		if (mode_deadlock_normal)
-		{
-			left_motor_straight = -50;
-			right_motor_straight = -50;
-			if (arbitrary_turn_right_left)
-			{
-				left_motor_curve = 100;
-				right_motor_curve = -100;
-
-			}
+			// Normal operation
 			else
 			{
-				left_motor_curve = -100;
-				right_motor_curve = 100;
+				straight_power = pid_process (echo_center_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
+				left_side_power = pid_process (echo_right_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
+				right_side_power = pid_process (echo_left_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
+				diff_power = pid_process ( (echo_left_time_us_trunc - echo_right_time_us_trunc), 0, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
 			}
+
+			// get absolute value of power and put it into "weight" variable
+			if (straight_power >= 0) straight_weight= straight_power;
+			else straight_weight= -1 * straight_power;
+			if (left_side_power >= 0) left_side_weight= left_side_power;
+			else left_side_weight = -1 * left_side_power;
+			if (right_side_power >= 0) right_side_weight= right_side_power;
+			else right_side_weight= -1 * right_side_power;
+			if (diff_power >= 0) diff_weight= diff_power;
+			else diff_weight= -1 * diff_power;
+
+			// straight and curve percentage combine. The more value, the more weight
+			left_motor_power_sum = straight_weight + left_side_weight - diff_weight;
+			right_motor_power_sum = straight_weight + right_side_weight + diff_weight;
+
+			// get motor power
+			left_motor_duty_float = straight_weight / left_motor_power_sum * straight_power + left_side_weight / left_motor_power_sum * left_side_power + diff_weight / left_motor_power_sum * diff_power;
+			left_motor_duty_float = straight_weight / right_motor_power_sum * straight_power + right_side_weight / right_motor_power_sum * right_side_power + diff_weight / right_motor_power_sum * diff_power;
+
+			// motor value normalize to percentage
+			if (left_motor_duty_float < 100 &&  left_motor_duty_float > -100) left_motor_duty_float = 0;
+			else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) + 43;
+			else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) - 43;
+			if (right_motor_duty_float < 100 &&  right_motor_duty_float > -100) right_motor_duty_float = 0;
+			else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) + 43;
+			else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) - 43;
+
+			// convert to integer value
+			left_motor_duty_int = (int) left_motor_duty_float;
+			right_motor_duty_int = (int) right_motor_duty_float;
+
+			// motor output compensation
+			if (left_motor_duty_int > 0) left_motor_duty_int -= 3;
+			else if (left_motor_duty_int < 0) left_motor_duty_int += 3;
+
+			if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
 		}
-		else
-		{
-			left_motor_curve = pid_process (echo_right_time_us_limited - curve_current_value, CURVE_SENSOR_VALUE_THRESHOLD, -1 * kpc, -1 * kic, -1 * kdc, SAMPLE_TIME_S, &curve_integral_left, &curve_prev_value_left);
-			right_motor_curve = pid_process (echo_left_time_us_limited + curve_current_value, CURVE_SENSOR_VALUE_THRESHOLD, -1 * kpc, -1 * kic, -1 * kdc, SAMPLE_TIME_S, &curve_integral_right, &curve_prev_value_right);
 
-			// adjust sensor value to percentage
-			left_motor_curve = left_motor_curve / CURVE_SENSOR_VALUE_AT_MAX_SPEED * 100;
-			right_motor_curve = right_motor_curve / CURVE_SENSOR_VALUE_AT_MAX_SPEED * 100;
-
-			// truncate above 100
-			if (left_motor_curve > 100) left_motor_curve = 100;
-			else if (left_motor_curve < -100) left_motor_curve = -100;
-			if (right_motor_curve > 100) right_motor_curve = 100;
-			else if (right_motor_curve < -100) right_motor_curve = -100;
-		}
-
-		// straight percentage calculate
-		float left_motor_straight_percent, right_motor_straight_percent;
-		if (left_motor_straight >= 0) left_motor_straight_percent = left_motor_straight;
-		else left_motor_straight_percent = -1 * left_motor_straight;
-		if (right_motor_straight >= 0) right_motor_straight_percent = right_motor_straight;
-		else right_motor_straight_percent = -1 * right_motor_straight;
-
-		// curve percentage calculate
-		float left_curve_percentage, right_curve_percentage;
-		if (left_motor_curve >= 0) left_curve_percentage = left_motor_curve;
-		else left_curve_percentage = -1 * left_motor_curve;
-		if (right_motor_curve >= 0) right_curve_percentage = right_motor_curve;
-		else right_curve_percentage = -1 * right_motor_curve;
-
-		// straight and curve percentage combine. The more value, the more weight
-		float left_straight_curve_sum = left_motor_straight_percent + left_curve_percentage;
-		float right_straight_curve_sum = right_motor_straight_percent + right_curve_percentage;
-		left_motor_duty_float = left_motor_straight_percent / left_straight_curve_sum * left_motor_straight + left_curve_percentage / left_straight_curve_sum * left_motor_curve;
-		right_motor_duty_float = right_motor_straight_percent / right_straight_curve_sum * right_motor_straight + right_curve_percentage / right_straight_curve_sum * right_motor_curve;
-
-		// truncate above maximum value
-//		if (left_motor_duty_float > 100) left_motor_duty_float = 100;
-//		else if (left_motor_duty_float < -100) left_motor_duty_float = -100;
-//		if (right_motor_duty_float > 100) right_motor_duty_float = 100;
-//		else if (right_motor_duty_float < -100) right_motor_duty_float = -100;
-
-		// motor value normalize (0~100 to MIN_VAL~100)
-		if (left_motor_duty_float < 0.02 &&  left_motor_duty_float > -0.02) left_motor_duty_float = 0;
-		else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / 100 * (100 - 43) + 43;
-		else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / 100 * (100 - 43) - 43;
-		if (right_motor_duty_float < 0.02 &&  right_motor_duty_float > -0.02) right_motor_duty_float = 0;
-		else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / 100 * (100 - 43) + 43;
-		else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / 100 * (100 - 43) - 43;
-
-		// convert to integer value
-		left_motor_duty_int = (int) left_motor_duty_float;
-		right_motor_duty_int = (int) right_motor_duty_float;
-
-		// motor output compensation
-		if (left_motor_duty_int > 0) left_motor_duty_int -= 3;
-		else if (left_motor_duty_int < 0) left_motor_duty_int += 3;
-
-		if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
-	  }
-
-	  osDelay(SAMPLE_TIME_S * 1000.0);
+		osDelay(SAMPLE_TIME_S * 1000.0);
 	}
-  /* USER CODE END StartTask_auto_drive */
+	/* USER CODE END StartTask_auto_drive */
 }
 
 /* USER CODE BEGIN Header_StartTask_get_echo_time */
