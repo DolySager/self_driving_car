@@ -165,7 +165,7 @@ int main(void)
 
   HAL_UARTEx_ReceiveToIdle_DMA(&huart_bluetooth, (uint8_t*) rxBuffer, 20);
 
-  printf("Program start\n");
+  printf("\nProgram start\nFor available commands, type \"help\".\n");
   /* USER CODE END 2 */
 
   /* Init scheduler */

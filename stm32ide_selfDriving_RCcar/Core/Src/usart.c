@@ -120,6 +120,14 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 					if (mode_monitor_on_off) printf("monitor on");
 					else printf("monitor off");
 				}
+				else if (!strcmp(token, "help"))
+				{
+					printf("mode: turn on/off autonomous mode\n");
+					printf("show: show pid constants\n");
+					printf("monitor: monitor sensor values & motor powers\n");
+					printf("set [kps|kis|kds|kpc|kic|kdc] <float>: set pid constant\n");
+					printf("help: display this message\n");
+				}
 				else
 				{
 					printf("Command Error");
