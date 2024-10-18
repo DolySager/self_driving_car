@@ -67,9 +67,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 					if (mode_auto_manu) printf("Autonomous Mode");
 					else printf("Manual Mode");
 					if (!mode_auto_manu) RCcar_stop();
-					center_integral = 0;
-					curve_integral_left = 0;
-					curve_integral_right = 0;
+					integral_straight = 0;
+					integral_left = 0;
+					integral_right = 0;
 				}
 				else if (!strcmp(token, "set"))
 				{
@@ -90,20 +90,55 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 						kds = num;
 						printf("kds set to %.5f", num);
 					}
-					else if (!strcmp(token, "kpc"))
+					else if (!strcmp(token, "kpl"))
 					{
-						kpc = num;
-						printf("kpc set to %.5f", num);
+						kpl = num;
+						printf("kpl set to %.5f", num);
 					}
-					else if (!strcmp(token, "kic"))
+					else if (!strcmp(token, "kil"))
 					{
-						kic = num;
-						printf("kic set to %.5f", num);
+						kil = num;
+						printf("kil set to %.5f", num);
 					}
-					else if (!strcmp(token, "kdc"))
+					else if (!strcmp(token, "kdl"))
 					{
-						kdc = num;
-						printf("kdc set to %.5f", num);
+						kdl = num;
+						printf("kdl set to %.5f", num);
+					}
+					else if (!strcmp(token, "kpr"))
+					{
+						kpr = num;
+						printf("kpr set to %.5f", num);
+					}
+					else if (!strcmp(token, "kir"))
+					{
+						kir = num;
+						printf("kir set to %.5f", num);
+					}
+					else if (!strcmp(token, "kdr"))
+					{
+						kdr = num;
+						printf("kdr set to %.5f", num);
+					}
+					else if (!strcmp(token, "opp"))
+					{
+						opposite_constant = num;
+						printf("opposite constant set to %.5f", num);
+					}
+					else if (!strcmp(token, "max"))
+					{
+						sensor_value_max_speed = num;
+						printf("max sensor value set to %.5f", num);
+					}
+					else if (!strcmp(token, "dir"))
+					{
+						sensor_value_dir_change = num;
+						printf("direction change sensor value set to %.5f", num);
+					}
+					else if (!strcmp(token, "dl"))
+					{
+						deadlock_threshold_value = num;
+						printf("deadlock distance set to %.5f", num);
 					}
 					else
 					{
@@ -112,7 +147,13 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 				}
 				else if (!strcmp(token, "show"))
 				{
-					printf("\nkps %.5f kis %.5f kds %.5f\nkpc %.5f kic %.5f kdc %.5f", kps, kis, kds, kpc, kic, kdc);
+					printf("\nkps %.5f kis %.5f kds %.5f", kps, kis, kds);
+					printf("\nkpl %.5f kil %.5f kdl %.5f", kpl, kil, kdl);
+					printf("\nkpr %.5f kir %.5f kdr %.5f", kpr, kir, kdr);
+					printf("\nopposite constant: %.5f", opposite_constant);
+					printf("\nmax sensor value: %.5f", sensor_value_max_speed);
+					printf("\ndir change value: %.5f", sensor_value_dir_change);
+					printf("\ndeadlock value: %.5f", deadlock_threshold_value);
 				}
 				else if (!strcmp(token, "monitor"))
 				{
@@ -122,11 +163,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 				}
 				else if (!strcmp(token, "help"))
 				{
-					printf("mode: turn on/off autonomous mode\n");
-					printf("show: show pid constants\n");
-					printf("monitor: monitor sensor values & motor powers\n");
-					printf("set [kps|kis|kds|kpc|kic|kdc] <float>: set pid constant\n");
-					printf("help: display this message\n");
+					printf("\nmode: turn on/off autonomous mode");
+					printf("\nshow: show constants");
+					printf("\nmonitor: monitor sensor values & motor powers");
+					printf("\nset k[p|i|d][s|l|r] <float>: set pid constant");
+					printf("\nset opp <float: 0..1>: set opposite constant");
+					printf("\nset max <float>: set maximum sensor value allowed");
+					printf("\nset dir <float>: set direction changing sensor value");
+					printf("\nset dl <float>: set deadlock distance");
+					printf("\nhelp: display this message");
 				}
 				else
 				{

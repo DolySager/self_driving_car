@@ -133,11 +133,12 @@ void MX_FREERTOS_Init(void) {
 * @retval None
 */
 // positive error means positive motor power. target and current value position swapped.
+#define INTEGRAL_ACCUM_MAX 2000
 float pid_process (float current_value, float target_value, float kp, float ki, float kd, float dt, float* integral_ptr, float* prev_value_ptr)
 {
 	float error = current_value - target_value;
 	float p_term = kp * error;
-	*integral_ptr += error * dt;
+	if (*integral_ptr < INTEGRAL_ACCUM_MAX) *integral_ptr += error * dt;
 	float i_term = ki * *integral_ptr;
 	float d_term = kd * (current_value - *prev_value_ptr) / dt;
 	*prev_value_ptr = current_value;
@@ -145,17 +146,21 @@ float pid_process (float current_value, float target_value, float kp, float ki, 
 	return p_term + i_term - d_term;
 }
 
-#define SENSOR_VALUE_AT_MAX_SPEED 2000
-#define SENSOR_VALUE_AT_DIR_CHANGE 600
-#define MOTOR_ERROR_PERCENTAGE_TOLERANCE 5
-#define DEADLOCK_THRESHOLD_VALUE 400
+// return absolute value of float
+float float_abs(float input_float)
+{
+	if (input_float > 0) return input_float;
+	else return (-1 * input_float);
+}
+
 #define SAMPLE_TIME_S 0.01
-float center_prev_value = 0, curve_prev_value_left = 0, curve_prev_value_right = 0;
+
+float prev_value_straight = 0, prev_value_left = 0, prev_value_right = 0;
 /* USER CODE END Header_StartTask_auto_drive */
 void StartTask_auto_drive(void *argument)
 {
 	/* USER CODE BEGIN StartTask_auto_drive */
-	deadlock_threshold = DEADLOCK_THRESHOLD_VALUE;
+	deadlock_threshold = deadlock_threshold_value;
 	osDelay(1000);
 	/* Infinite loop */
 	for(;;)
@@ -167,20 +172,11 @@ void StartTask_auto_drive(void *argument)
 		// Sensor value truncated
 		float echo_left_time_us_trunc, echo_center_time_us_trunc, echo_right_time_us_trunc;
 
-		// Straight direction motor power
-		float straight_power;
-		float straight_weight;
+		float straight_power;	// Straight direction motor power
+		float left_power, right_power;	// One-side motor power
+		float opposite_left_power, opposite_right_power;	// The other-side motor power
 
-		// One-side motor power
-		float left_side_power, right_side_power;
-		float left_side_weight, right_side_weight;
-
-		// Side-distance-difference motor power
-		float diff_power;
-		float diff_weight;
-
-		// sum for weight calculation
-		float left_motor_power_sum, right_motor_power_sum;
+		float left_weight_sum, right_weight_sum;	// sum for weight calculation
 
 		if (mode_auto_manu || mode_monitor_on_off)
 		{
@@ -188,11 +184,11 @@ void StartTask_auto_drive(void *argument)
 			// SENSOR VALUE TRUNCATE //
 			///////////////////////////
 
-			if (echo_left_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_left_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			if (echo_left_time_us > sensor_value_max_speed) echo_left_time_us_trunc = sensor_value_max_speed;
 			else echo_left_time_us_trunc = echo_left_time_us;
-			if (echo_center_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_center_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			if (echo_center_time_us > sensor_value_max_speed) echo_center_time_us_trunc = sensor_value_max_speed;
 			else echo_center_time_us_trunc = echo_center_time_us;
-			if (echo_right_time_us > SENSOR_VALUE_AT_MAX_SPEED) echo_right_time_us_trunc = SENSOR_VALUE_AT_MAX_SPEED;
+			if (echo_right_time_us > sensor_value_max_speed) echo_right_time_us_trunc = sensor_value_max_speed;
 			else echo_right_time_us_trunc = echo_right_time_us;
 
 
@@ -206,7 +202,7 @@ void StartTask_auto_drive(void *argument)
 				{
 					mode_deadlock_normal = 1;
 					if (mode_monitor_on_off) printf("Deadlock mode on\n");
-					deadlock_threshold = DEADLOCK_THRESHOLD_VALUE * 2;
+					deadlock_threshold = deadlock_threshold_value * 2;
 				}
 			}
 			// reject sensor value if it is touching wall
@@ -216,7 +212,7 @@ void StartTask_auto_drive(void *argument)
 				{
 					mode_deadlock_normal = 0;
 					if (mode_monitor_on_off) printf("Deadlock mode off\n");
-					deadlock_threshold = SENSOR_VALUE_AT_DIR_CHANGE;
+					deadlock_threshold = deadlock_threshold_value;
 				}
 			}
 
@@ -227,63 +223,50 @@ void StartTask_auto_drive(void *argument)
 			// Hard-coded value if deadlocked
 			if (mode_deadlock_normal)
 			{
-				straight_power = -50;
-				diff_power = -100;
+				straight_power = -100;
 				if (arbitrary_turn_right_left)
 				{
-					left_side_power = 100;
-					right_side_power = -100;
+					left_power = 100;
+					right_power = -100;
 
 				}
 				else
 				{
-					left_side_power = -100;
-					right_side_power = 100;
+					left_power = -100;
+					right_power = 100;
 				}
 			}
 
 			// Normal operation
 			else
 			{
-				straight_power = pid_process (echo_center_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
-				left_side_power = pid_process (echo_right_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
-				right_side_power = pid_process (echo_left_time_us_trunc, SENSOR_VALUE_AT_DIR_CHANGE, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
-				diff_power = pid_process ( (echo_left_time_us_trunc - echo_right_time_us_trunc), 0, kps, kis, kds, SAMPLE_TIME_S, &center_integral, &center_prev_value);
+				straight_power = pid_process (echo_center_time_us_trunc, sensor_value_dir_change, kps, kis, kds, SAMPLE_TIME_S, &integral_straight, &prev_value_straight);
+				left_power = pid_process (echo_right_time_us_trunc, sensor_value_dir_change, kpl, kil, kdl, SAMPLE_TIME_S, &integral_left, &prev_value_left);
+				right_power = pid_process (echo_left_time_us_trunc, sensor_value_dir_change, kpr, kir, kdr, SAMPLE_TIME_S, &integral_right, &prev_value_right);
 			}
 
-			// get absolute value of power and put it into "weight" variable
-			if (straight_power >= 0) straight_weight= straight_power;
-			else straight_weight= -1 * straight_power;
-			if (left_side_power >= 0) left_side_weight= left_side_power;
-			else left_side_weight = -1 * left_side_power;
-			if (right_side_power >= 0) right_side_weight= right_side_power;
-			else right_side_weight= -1 * right_side_power;
-			if (diff_power >= 0) diff_weight= diff_power;
-			else diff_weight= -1 * diff_power;
+			opposite_left_power = left_power * opposite_constant;
+			opposite_right_power = right_power * opposite_constant;
 
-			// straight and curve percentage combine. The more value, the more weight
-			left_motor_power_sum = straight_weight + left_side_weight - diff_weight;
-			right_motor_power_sum = straight_weight + right_side_weight + diff_weight;
+			// sum of weigth calculation
+			left_weight_sum = float_abs(straight_power) + float_abs(left_power) + float_abs(opposite_right_power);
+			right_weight_sum = float_abs(straight_power) + float_abs(right_power) + float_abs(opposite_left_power);
 
-			// get motor power
-			left_motor_duty_float = straight_weight / left_motor_power_sum * straight_power + left_side_weight / left_motor_power_sum * left_side_power + diff_weight / left_motor_power_sum * diff_power;
-			left_motor_duty_float = straight_weight / right_motor_power_sum * straight_power + right_side_weight / right_motor_power_sum * right_side_power + diff_weight / right_motor_power_sum * diff_power;
+			// Get motor power. The more value, the more weight
+			left_motor_duty_float = float_abs(straight_power) / left_weight_sum * straight_power + float_abs(left_power) / left_weight_sum * left_power - float_abs(opposite_right_power) / left_weight_sum * opposite_right_power;
+			right_motor_duty_float = float_abs(straight_power) / right_weight_sum * straight_power + float_abs(right_power) / right_weight_sum * right_power - float_abs(opposite_left_power) / right_weight_sum * opposite_left_power;
 
 			// motor value normalize to percentage
-			if (left_motor_duty_float < 100 &&  left_motor_duty_float > -100) left_motor_duty_float = 0;
-			else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) + 43;
-			else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) - 43;
-			if (right_motor_duty_float < 100 &&  right_motor_duty_float > -100) right_motor_duty_float = 0;
-			else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) + 43;
-			else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / SENSOR_VALUE_AT_MAX_SPEED / 100 * (100 - 43) - 43;
+			if (left_motor_duty_float < 1 &&  left_motor_duty_float > -1) left_motor_duty_float = 0;
+			else if (left_motor_duty_float > 0) left_motor_duty_float = left_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) + 43;
+			else if (left_motor_duty_float < 0) left_motor_duty_float = left_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) - 43;
+			if (right_motor_duty_float < 1 &&  right_motor_duty_float > -1) right_motor_duty_float = 0;
+			else if (right_motor_duty_float > 0) right_motor_duty_float = right_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) + 43;
+			else if (right_motor_duty_float < 0) right_motor_duty_float = right_motor_duty_float / (sensor_value_max_speed - sensor_value_dir_change) * (100 - 43) - 43;
 
 			// convert to integer value
 			left_motor_duty_int = (int) left_motor_duty_float;
 			right_motor_duty_int = (int) right_motor_duty_float;
-
-			// motor output compensation
-			if (left_motor_duty_int > 0) left_motor_duty_int -= 3;
-			else if (left_motor_duty_int < 0) left_motor_duty_int += 3;
 
 			if (mode_auto_manu) RCcar_set_motor_speed(left_motor_duty_int, right_motor_duty_int);
 		}
@@ -316,7 +299,7 @@ void StartTask_get_echo_time(void *argument)
 	// reject too high values
 	if (echo_left_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_left_time_queue[echo_left_time_queue_index++] = echo_left_time_us_temp;
 	if (echo_center_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_center_time_queue[echo_center_time_queue_index++] = echo_center_time_us_temp;
-	if (echo_right_echo_left_time_us_limited_temp < SENSOR_VALUE_THRESHOLD) echo_right_time_queue[echo_right_time_queue_index++] = echo_right_time_us_temp;
+	if (echo_right_time_us_temp < SENSOR_VALUE_THRESHOLD) echo_right_time_queue[echo_right_time_queue_index++] = echo_right_time_us_temp;
 
 	int echo_left_sum = 0, echo_center_sum = 0, echo_right_sum = 0;
 	for (uint8_t i=0; i<VALUE_QUEUE_SIZE; ++i)

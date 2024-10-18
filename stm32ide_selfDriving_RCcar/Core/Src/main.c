@@ -83,8 +83,13 @@ int left_motor_duty_int, right_motor_duty_int;
 int left_motor_duty_int_raw, right_motor_duty_int_raw;
 uint8_t arbitrary_turn_right_left = 0;
 uint32_t deadlock_threshold = 800;
-float kps = 1, kis = 0, kds = 0, kpc = 1, kic = 0, kdc = 0;
-float center_integral, curve_integral_left, curve_integral_right;
+float kps = 1, kis = 0, kds = 0;
+float kpl = 1, kil = 0, kdl = 0;
+float kpr = 1, kir = 0, kdr = 0;
+float integral_straight = 0, integral_left = 0, integral_right;
+float opposite_constant = 1;
+float sensor_value_max_speed = 2000, sensor_value_dir_change = 600, deadlock_threshold_value = 400;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/

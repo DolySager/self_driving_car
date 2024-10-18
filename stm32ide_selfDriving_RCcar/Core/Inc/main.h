@@ -125,8 +125,12 @@ extern uint8_t arbitrary_turn_right_left;
 extern uint32_t deadlock_threshold;
 extern uint16_t echo_left_time_queue[VALUE_QUEUE_SIZE], echo_center_time_queue[VALUE_QUEUE_SIZE], echo_right_time_queue[VALUE_QUEUE_SIZE];
 extern uint8_t echo_left_time_queue_index, echo_center_time_queue_index, echo_right_time_queue_index;
-extern float kps, kis, kds, kpc, kic, kdc;
-extern float center_integral, curve_integral_left, curve_integral_right;
+extern float kps, kis, kds;
+extern float kpl, kil, kdl;
+extern float kpr, kir, kdr;
+extern float integral_straight, integral_left, integral_right;
+extern float opposite_constant;
+extern float sensor_value_max_speed, sensor_value_dir_change, deadlock_threshold_value;
 
 /* USER CODE END Private defines */
 
